@@ -23,10 +23,13 @@ using namespace std;
 
 unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false);
 
-class Model 
+// 创建默认纹理的辅助函数
+unsigned int CreateDefaultTexture();
+
+class Model
 {
 public:
-    // model data 
+    // model data
     vector<Texture> textures_loaded;	// stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
     vector<Mesh>    meshes;
     string directory;
@@ -44,7 +47,7 @@ public:
         for(unsigned int i = 0; i < meshes.size(); i++)
             meshes[i].Draw(shader);
     }
-    
+
 private:
     // loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
     void loadModel(string const &path)
@@ -71,7 +74,7 @@ private:
         // process each mesh located at the current node
         for(unsigned int i = 0; i < node->mNumMeshes; i++)
         {
-            // the node object only contains indices to index the actual objects in the scene. 
+            // the node object only contains indices to index the actual objects in the scene.
             // the scene contains all the data, node is just to keep stuff organized (like relations between nodes).
             aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
             meshes.push_back(processMesh(mesh, scene));
@@ -81,177 +84,104 @@ private:
         {
             processNode(node->mChildren[i], scene);
         }
-
     }
 
-//    Mesh processMesh(aiMesh *mesh, const aiScene *scene)
-//    {
-//        // data to fill
-//        vector<Vertex> vertices;
-//        vector<unsigned int> indices;
-//        vector<Texture> textures;
-//
-//        // walk through each of the mesh's vertices
-//        for(unsigned int i = 0; i < mesh->mNumVertices; i++)
-//        {
-//            Vertex vertex;
-//            glm::vec3 vector; // we declare a placeholder vector since assimp uses its own vector class that doesn't directly convert to glm's vec3 class so we transfer the data to this placeholder glm::vec3 first.
-//            // positions
-//            vector.x = mesh->mVertices[i].x;
-//            vector.y = mesh->mVertices[i].y;
-//            vector.z = mesh->mVertices[i].z;
-//            vertex.Position = vector;
-//            // normals
-//            if (mesh->HasNormals())
-//            {
-//                vector.x = mesh->mNormals[i].x;
-//                vector.y = mesh->mNormals[i].y;
-//                vector.z = mesh->mNormals[i].z;
-//                vertex.Normal = vector;
-//            }
-//            // texture coordinates
-//            if(mesh->mTextureCoords[0]) // does the mesh contain texture coordinates?
-//            {
-//                glm::vec2 vec;
-//                // a vertex can contain up to 8 different texture coordinates. We thus make the assumption that we won't
-//                // use models where a vertex can have multiple texture coordinates so we always take the first set (0).
-//                vec.x = mesh->mTextureCoords[0][i].x;
-//                vec.y = mesh->mTextureCoords[0][i].y;
-//                vertex.TexCoords = vec;
-//                // tangent
-//                vector.x = mesh->mTangents[i].x;
-//                vector.y = mesh->mTangents[i].y;
-//                vector.z = mesh->mTangents[i].z;
-//                vertex.Tangent = vector;
-//                // bitangent
-//                vector.x = mesh->mBitangents[i].x;
-//                vector.y = mesh->mBitangents[i].y;
-//                vector.z = mesh->mBitangents[i].z;
-//                vertex.Bitangent = vector;
-//            }
-//            else
-//                vertex.TexCoords = glm::vec2(0.0f, 0.0f);
-//
-//            vertices.push_back(vertex);
-//        }
-//        // now wak through each of the mesh's faces (a face is a mesh its triangle) and retrieve the corresponding vertex indices.
-//        for(unsigned int i = 0; i < mesh->mNumFaces; i++)
-//        {
-//            aiFace face = mesh->mFaces[i];
-//            // retrieve all indices of the face and store them in the indices vector
-//            for(unsigned int j = 0; j < face.mNumIndices; j++)
-//                indices.push_back(face.mIndices[j]);
-//        }
-//        // process materials
-//        aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-//        // we assume a convention for sampler names in the shaders. Each diffuse texture should be named
-//        // as 'texture_diffuseN' where N is a sequential number ranging from 1 to MAX_SAMPLER_NUMBER.
-//        // Same applies to other texture as the following list summarizes:
-//        // diffuse: texture_diffuseN
-//        // specular: texture_specularN
-//        // normal: texture_normalN
-//
-//        // 1. diffuse maps
-//        vector<Texture> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
-//        textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
-//        // 2. specular maps
-//        vector<Texture> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
-//        textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
-//        // 3. normal maps
-//        std::vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_normal");
-//        textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
-//        // 4. height maps
-//        std::vector<Texture> heightMaps = loadMaterialTextures(material, aiTextureType_AMBIENT, "texture_height");
-//        textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
-//
-//        // return a mesh object created from the extracted mesh data
-//        return Mesh(vertices, indices, textures);
-//    }
     Mesh processMesh(aiMesh *mesh, const aiScene *scene)
-{
-    // data to fill
-    vector<Vertex> vertices;
-    vector<unsigned int> indices;
-    vector<Texture> textures;
-
-    // 遍历所有顶点
-    for (unsigned int i = 0; i < mesh->mNumVertices; i++)
     {
-        Vertex vertex;
-        glm::vec3 vector;
+        // data to fill
+        vector<Vertex> vertices;
+        vector<unsigned int> indices;
+        vector<Texture> textures;
 
-        // 位置
-        vector.x = mesh->mVertices[i].x;
-        vector.y = mesh->mVertices[i].y;
-        vector.z = mesh->mVertices[i].z;
-        vertex.Position = vector;
-
-        // 法线
-        if (mesh->HasNormals())
+        // 遍历所有顶点
+        for (unsigned int i = 0; i < mesh->mNumVertices; i++)
         {
-            vector.x = mesh->mNormals[i].x;
-            vector.y = mesh->mNormals[i].y;
-            vector.z = mesh->mNormals[i].z;
-            vertex.Normal = vector;
+            Vertex vertex;
+            glm::vec3 vector;
+
+            // 位置
+            vector.x = mesh->mVertices[i].x;
+            vector.y = mesh->mVertices[i].y;
+            vector.z = mesh->mVertices[i].z;
+            vertex.Position = vector;
+
+            // 法线
+            if (mesh->HasNormals())
+            {
+                vector.x = mesh->mNormals[i].x;
+                vector.y = mesh->mNormals[i].y;
+                vector.z = mesh->mNormals[i].z;
+                vertex.Normal = vector;
+            }
+
+            // 纹理坐标
+            if (mesh->mTextureCoords[0])
+            {
+                glm::vec2 vec;
+                vec.x = mesh->mTextureCoords[0][i].x;
+                vec.y = mesh->mTextureCoords[0][i].y;
+                vertex.TexCoords = vec;
+            }
+            else
+            {
+                vertex.TexCoords = glm::vec2(0.0f, 0.0f);
+            }
+
+            vertices.push_back(vertex);
         }
 
-        // 纹理坐标
-        if (mesh->mTextureCoords[0])
+        // 处理索引
+        for (unsigned int i = 0; i < mesh->mNumFaces; i++)
         {
-            glm::vec2 vec;
-            vec.x = mesh->mTextureCoords[0][i].x;
-            vec.y = mesh->mTextureCoords[0][i].y;
-            vertex.TexCoords = vec;
+            aiFace face = mesh->mFaces[i];
+            for (unsigned int j = 0; j < face.mNumIndices; j++)
+                indices.push_back(face.mIndices[j]);
+        }
+
+        // 处理材质
+        if (scene->HasMaterials() && mesh->mMaterialIndex >= 0)
+        {
+            aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
+
+            // 1. 处理漫反射贴图
+            vector<Texture> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
+            textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
+
+            // 2. 处理高光贴图
+            vector<Texture> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
+            textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
+
+            // 3. 处理法线贴图
+            vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_normal");
+            textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
+
+            // 如果没有加载任何纹理，添加默认纹理
+            if (textures.empty())
+            {
+                cout << "No textures found for mesh, using default texture.\n";
+                Texture defaultTexture;
+                defaultTexture.id = CreateDefaultTexture(); // 使用新创建的默认纹理
+                defaultTexture.type = "texture_diffuse";   // 默认类型为漫反射
+                defaultTexture.path = "default_texture";
+                textures.push_back(defaultTexture);
+                textures_loaded.push_back(defaultTexture);
+            }
         }
         else
         {
-            vertex.TexCoords = glm::vec2(0.0f, 0.0f);
+            cout << "No material found for this mesh, creating default texture.\n";
+            Texture defaultTexture;
+            defaultTexture.id = CreateDefaultTexture(); // 使用新创建的默认纹理
+            defaultTexture.type = "texture_diffuse";   // 默认类型为漫反射
+            defaultTexture.path = "default_texture";
+            textures.push_back(defaultTexture);
+            textures_loaded.push_back(defaultTexture);
         }
 
-        vertices.push_back(vertex);
+        return Mesh(vertices, indices, textures);
     }
-
-    // 处理索引
-    for (unsigned int i = 0; i < mesh->mNumFaces; i++)
-    {
-        aiFace face = mesh->mFaces[i];
-        for (unsigned int j = 0; j < face.mNumIndices; j++)
-            indices.push_back(face.mIndices[j]);
-    }
-
-    // 处理材质
-    if (scene->HasMaterials() && mesh->mMaterialIndex >= 0)
-    {
-        aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
-
-        // 1. 处理漫反射贴图
-        vector<Texture> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
-        if (diffuseMaps.empty())
-        {
-            // 如果没有漫反射贴图，使用默认颜色
-            std::cout << "Mesh has no diffuse texture, using default material.\n";
-        }
-        textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
-
-        // 2. 处理高光贴图
-        vector<Texture> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
-        textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
-
-        // 3. 处理法线贴图
-        vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_normal");
-        textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
-    }
-    else
-    {
-        std::cout << "No material found for this mesh, using default material.\n";
-    }
-
-    return Mesh(vertices, indices, textures);
-}
-
 
     // checks all material textures of a given type and loads the textures if they're not loaded yet.
-    // the required info is returned as a Texture struct.
     vector<Texture> loadMaterialTextures(aiMaterial *mat, aiTextureType type, string typeName)
     {
         vector<Texture> textures;
@@ -276,7 +206,7 @@ private:
             if (!skip)
             {
                 Texture texture;
-                texture.id = TextureFromFile(str.C_Str(), this->directory);
+                texture.id = TextureFromFile(str.C_Str(), this->directory, gammaCorrection);
                 texture.type = typeName;
                 texture.path = str.C_Str();
                 textures.push_back(texture);
@@ -284,22 +214,28 @@ private:
             }
         }
 
-        // **如果没有找到贴图，创建一个默认纹理**
-        if (textures.empty())
-        {
-            std::cout << "No texture found for type: " << typeName << ", using default texture.\n";
-            Texture defaultTexture;
-            defaultTexture.id = 0; // 可以创建一个默认颜色的纹理
-            defaultTexture.type = typeName;
-            defaultTexture.path = "default";
-            textures.push_back(defaultTexture);
-        }
-
         return textures;
     }
-
 };
 
+// 创建默认纹理（纯灰色 1x1 纹理）
+unsigned int CreateDefaultTexture()
+{
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    // 创建 1x1 像素的灰色纹理 (RGB: 128, 128, 128)
+    unsigned char data[] = { 128, 128, 128, 255 }; // RGBA
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    return textureID;
+}
 
 unsigned int TextureFromFile(const char *path, const string &directory, bool gamma)
 {
@@ -334,10 +270,11 @@ unsigned int TextureFromFile(const char *path, const string &directory, bool gam
     }
     else
     {
-        std::cout << "Texture failed to load at path: " << path << std::endl;
+        cout << "Texture failed to load at path: " << path << endl;
         stbi_image_free(data);
     }
 
     return textureID;
 }
+
 #endif

@@ -83,8 +83,8 @@ int main()
     // load models
     // -----------
     // Model ourModel(FileSystem::getPath(R"(resources/objects/backpack/backpack.obj)"));
-    Model ourModel(FileSystem::getPath(R"(resources/objects/brain/Brain_Model.obj)"));
-    // Model ourModel(FileSystem::getPath(R"(resources/objects/wooden_storage_shelf/wooden_storage_shelf.fbx)"));
+    // Model ourModel(FileSystem::getPath(R"(resources/objects/brain/Brain_Model.obj)"));
+    Model ourModel(FileSystem::getPath(R"(resources/objects/human_brain/scenes/Brain_OBJ.obj)"));
 
 
     // draw in wireframe
