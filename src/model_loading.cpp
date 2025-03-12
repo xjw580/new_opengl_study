@@ -18,8 +18,8 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 
 // settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+const unsigned int SCR_WIDTH = 2000;
+const unsigned int SCR_HEIGHT = 1500;
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -80,11 +80,14 @@ int main()
     // -------------------------
     Shader ourShader(FileSystem::getPath(R"(resources/1.model_loading.vs)").c_str(), FileSystem::getPath(R"(resources/1.model_loading.fs)").c_str());
 
+
     // load models
     // -----------
     // Model ourModel(FileSystem::getPath(R"(resources/objects/backpack/backpack.obj)"));
     // Model ourModel(FileSystem::getPath(R"(resources/objects/brain/Brain_Model.obj)"));
-    Model ourModel(FileSystem::getPath(R"(resources/objects/human_brain/scenes/Brain_OBJ.obj)"));
+    // Model ourModel(FileSystem::getPath(R"(resources/objects/brain_areas/scene.gltf)"));
+
+    Model ourModel(FileSystem::getPath(R"(resources/objects/brain_project/scene.gltf)"));
 
 
     // draw in wireframe
@@ -111,6 +114,9 @@ int main()
 
         // don't forget to enable shader before setting uniforms
         ourShader.use();
+        ourShader.setVec3("lightPos", glm::vec3(2.0f, 2.0f, 2.0f)); // 光源位置
+        ourShader.setVec3("viewPos", camera.Position); // 相机位置
+        ourShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f)); // 光源颜色（白色）
 
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
