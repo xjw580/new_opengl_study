@@ -1,7 +1,8 @@
 #ifndef MODEL_H
 #define MODEL_H
 
-#include <glad/glad.h> 
+#include <filesystem>
+#include <glad/glad.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -56,7 +57,8 @@ private:
             cout << "ERROR::ASSIMP:: " << importer.GetErrorString() << endl;
             return;
         }
-        directory = path.substr(0, path.find_last_of('/'));
+        const std::filesystem::path filePath = path;
+        directory = filePath.parent_path().string();
         processNode(scene->mRootNode, scene);
     }
 

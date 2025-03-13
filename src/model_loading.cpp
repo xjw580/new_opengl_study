@@ -31,13 +31,17 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
+// fram
+float frame = 60;
+float min_fgt = 1.0f / frame;
+
 int main()
 {
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 #ifdef __APPLE__
@@ -46,8 +50,8 @@ int main()
 
     // glfw window creation
     // --------------------
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
-    if (window == NULL)
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", nullptr, nullptr);
+    if (window == nullptr)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -78,16 +82,18 @@ int main()
 
     // build and compile shaders
     // -------------------------
-    Shader ourShader(FileSystem::getPath(R"(resources/1.model_loading.vs)").c_str(), FileSystem::getPath(R"(resources/1.model_loading.fs)").c_str());
+    Shader ourShader(FileSystem::getPath(R"(resources/1.model_loading.vert)").c_str(), FileSystem::getPath(R"(resources/1.model_loading.frag)").c_str());
 
 
     // load models
     // -----------
     // Model ourModel(FileSystem::getPath(R"(resources/objects/backpack/backpack.obj)"));
-    // Model ourModel(FileSystem::getPath(R"(resources/objects/brain/Brain_Model.obj)"));
+    Model ourModel(FileSystem::getPath(R"(resources/objects/brain/Brain_Model.obj)"));
     // Model ourModel(FileSystem::getPath(R"(resources/objects/brain_areas/scene.gltf)"));
 
-    Model ourModel(FileSystem::getPath(R"(resources/objects/brain_project/scene.gltf)"));
+    // Model ourModel(FileSystem::getPath(R"(resources/objects/brain_project/scene.gltf)"));
+    // Model ourModel(FileSystem::getPath(R"(resources/objects/Human_Head.fbx)"));
+    // Model ourModel(FileSystem::getPath(R"(resources/objects/Woman_Head.obj)"));
 
 
     // draw in wireframe
@@ -99,9 +105,14 @@ int main()
     {
         // per-frame time logic
         // --------------------
-        float currentFrame = static_cast<float>(glfwGetTime());
+        auto currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
+        // if (deltaTime < min_fgt)
+        // {
+        //     double sleepTime = min_fgt - deltaTime;
+        //     glfwWaitEventsTimeout(sleepTime); // 让线程等待剩余的时间
+        // }
+        lastFrame = static_cast<float>(glfwGetTime());
 
         // input
         // -----
@@ -125,7 +136,7 @@ int main()
         ourShader.setMat4("view", view);
 
         // render the loaded model
-        glm::mat4 model = glm::mat4(1.0f);
+        glm::mat4 model = glm::mat4{1.0f};
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
         model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	// it's a bit too big for our scene, so scale it down
         ourShader.setMat4("model", model);
