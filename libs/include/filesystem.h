@@ -21,7 +21,7 @@ private:
     static std::string const & getRoot()
     {
         static char const * envRoot = getenv("LOGL_ROOT_PATH");
-        static char const * givenRoot = (envRoot != nullptr ? envRoot : logl_root);
+        static char const * givenRoot = (envRoot != nullptr ? envRoot : project_root);
         static std::string root = (givenRoot != nullptr ? givenRoot : "");
         return root;
     }
@@ -29,7 +29,7 @@ private:
     //static std::string(*foo (std::string const &)) getPathBuilder()
     static Builder getPathBuilder()
     {
-        if (getRoot() != "")
+        if (!getRoot().empty())
             return &FileSystem::getPathRelativeRoot;
         else
             return &FileSystem::getPathRelativeBinary;

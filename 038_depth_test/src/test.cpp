@@ -38,6 +38,14 @@ float lastFrame = 0.0f;
 float frame = 60;
 float min_fgt = 1.0f / frame;
 
+
+// 防止深度冲突
+// 第一个也是最重要的技巧是永远不要把多个物体摆得太靠近，以至于它们的一些三角形会重叠。通过在两个物体之间设置一个用户无法注意到的偏移值，你可以完全避免这两个物体之间的深度冲突。在箱子和地板的例子中，我们可以将箱子沿着正y轴稍微移动一点。箱子位置的这点微小改变将不太可能被注意到，但它能够完全减少深度冲突的发生。然而，这需要对每个物体都手动调整，并且需要进行彻底的测试来保证场景中没有物体会产生深度冲突。
+//
+// 第二个技巧是尽可能将近平面设置远一些。在前面我们提到了精度在靠近近平面时是非常高的，所以如果我们将近平面远离观察者，我们将会对整个平截头体有着更大的精度。然而，将近平面设置太远将会导致近处的物体被裁剪掉，所以这通常需要实验和微调来决定最适合你的场景的近平面距离。
+//
+// 另外一个很好的技巧是牺牲一些性能，使用更高精度的深度缓冲。大部分深度缓冲的精度都是24位的，但现在大部分的显卡都支持32位的深度缓冲，这将会极大地提高精度。所以，牺牲掉一些性能，你就能获得更高精度的深度测试，减少深度冲突。
+
 int main() {
     // glfw: initialize and configure
     // ------------------------------
@@ -84,21 +92,80 @@ int main() {
     // -------------------------
     // Shader ourShader(FileSystem::getPath(R"(resources/1.model_loading.vert)").c_str(), FileSystem::getPath(R"(resources/1.model_loading.frag)").c_str());
     Shader ourShader{
-        FileSystem::getPath(R"(resources/shader/037/assimp_demo.vert)").c_str(),
-        FileSystem::getPath(R"(resources/shader/037/assimp_demo.frag)").c_str()
+        FileSystem::getPath(R"(resources/shader/038/box.vert)").c_str(),
+        FileSystem::getPath(R"(resources/shader/038/box.frag)").c_str()
     };
 
+    auto vertices = std::vector<GLfloat>{
+        // positions          // normals           // texture coords
+        // 前面
+        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+        0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
+        0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+        -0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
 
-    // load models
-    // -----------
-    Model ourModel(FileSystem::getPath(R"(resources/objects/backpack/backpack.obj)"));
-    // Model ourModel{FileSystem::getPath(R"(resources/objects/brain/Brain_Model.obj)")};
-    // Model ourModel(FileSystem::getPath(R"(resources/objects/brain_areas/scene.gltf)"));
+        // 后面
+        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
+        0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f,
+        0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f,
+        -0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f,
 
-    // Model ourModel(FileSystem::getPath(R"(resources/objects/brain_project/scene.gltf)"));
-    // Model ourModel(FileSystem::getPath(R"(resources/objects/Human_Head.fbx)"));
-    // Model ourModel(FileSystem::getPath(R"(resources/objects/Woman_Head.obj)"));
+        // 左面
+        -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+        -0.5f, -0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+        -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
+        -0.5f, 0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
 
+        // 右面
+        0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+        0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+        0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
+        0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+
+        // 底面
+        -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f,
+        0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 1.0f,
+        0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+        -0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+
+        // 顶面
+        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+        0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
+        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+        -0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f
+    };
+
+    auto indices = std::vector<unsigned int>{
+        // 前面
+        0, 1, 2, 2, 3, 0,
+        // 后面
+        4, 5, 6, 6, 7, 4,
+        // 左面
+        8, 9, 10, 10, 11, 8,
+        // 右面
+        12, 13, 14, 14, 15, 12,
+        // 底面
+        16, 17, 18, 18, 19, 16,
+        // 顶面
+        20, 21, 22, 22, 23, 20
+    };
+    auto diffuseTexturePath = FileSystem::getPath("resources/texture/box_diffuse.png");
+    auto specularTexturePath = FileSystem::getPath("resources/texture/box_specular.png");
+    const std::string dir;
+    auto textures = std::vector<Texture>{
+        Texture{
+            TextureFromFile(diffuseTexturePath.c_str(), dir, false),
+            std::string{"texture_diffuse"},
+            aiString{diffuseTexturePath}
+        },
+        Texture{
+            TextureFromFile(specularTexturePath.c_str(), dir, false),
+            std::string{"texture_specular"},
+            aiString{specularTexturePath},
+        }
+    };
+
+    auto mesh = Mesh{vertices, indices, textures};
 
     // draw in wireframe
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -133,7 +200,8 @@ int main() {
         ourShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f)); // 光源颜色（白色）
 
         // view/projection transformations
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
+                                                100.0f);
         // glm::mat4 projection = glm::ortho(0.0f, 800.0f, 0.0f, 600.0f, 0.1f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
         ourShader.setMat4("projection", projection);
@@ -145,7 +213,7 @@ int main() {
         // translate it down so it's at the center of the scene
         model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f)); // it's a bit too big for our scene, so scale it down
         ourShader.setMat4("model", model);
-        ourModel.Draw(ourShader);
+        mesh.Draw(ourShader);
 
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)

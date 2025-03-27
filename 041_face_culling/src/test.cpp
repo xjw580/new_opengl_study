@@ -11,6 +11,10 @@
 #include <filesystem.h>
 
 #include <iostream>
+#include "meshs/BoxMesh.h"
+#include "meshs/WindowMesh.h"
+#include "meshs/GrassMesh.h"
+
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 
@@ -38,9 +42,36 @@ float lastFrame = 0.0f;
 float frame = 60;
 float min_fgt = 1.0f / frame;
 
+
+// 防止深度冲突
+// 第一个也是最重要的技巧是永远不要把多个物体摆得太靠近，以至于它们的一些三角形会重叠。通过在两个物体之间设置一个用户无法注意到的偏移值，你可以完全避免这两个物体之间的深度冲突。在箱子和地板的例子中，我们可以将箱子沿着正y轴稍微移动一点。箱子位置的这点微小改变将不太可能被注意到，但它能够完全减少深度冲突的发生。然而，这需要对每个物体都手动调整，并且需要进行彻底的测试来保证场景中没有物体会产生深度冲突。
+//
+// 第二个技巧是尽可能将近平面设置远一些。在前面我们提到了精度在靠近近平面时是非常高的，所以如果我们将近平面远离观察者，我们将会对整个平截头体有着更大的精度。然而，将近平面设置太远将会导致近处的物体被裁剪掉，所以这通常需要实验和微调来决定最适合你的场景的近平面距离。
+//
+// 另外一个很好的技巧是牺牲一些性能，使用更高精度的深度缓冲。大部分深度缓冲的精度都是24位的，但现在大部分的显卡都支持32位的深度缓冲，这将会极大地提高精度。所以，牺牲掉一些性能，你就能获得更高精度的深度测试，减少深度冲突。
+
+#define SHARER_DIR "resources/shader/041"
+
+auto boxPos = std::vector<glm::vec3>{
+    glm::vec3{0.0f, 0.0f, -1.0f},
+    glm::vec3{2.0f, 0.0f, -1.0f},
+};
+
+// 先绘制远处的镜子，防止因深度测试导致远处镜子的片段不绘制
+auto windowPos = std::vector<glm::vec3>{
+    glm::vec3{1.0f, 0.0f, 0.0f},
+    glm::vec3{0.0f, 0.0f, 1.0f},
+    glm::vec3{2.0f, 0.0f, 1.0f},
+};
+
+auto grassPos = std::vector<glm::vec3>{
+    glm::vec3{1.0f, 0.0f, -0.5},
+    glm::vec3{0.0f, 0.0f, 1.5},
+    glm::vec3{2.0f, 0.0f, -0.25},
+    glm::vec3{1.0f, 0.0f, 2.5},
+};
+
 int main() {
-    // glfw: initialize and configure
-    // ------------------------------
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
@@ -50,8 +81,6 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-    // glfw window creation
-    // --------------------
     GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", nullptr, nullptr);
     if (window == nullptr) {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -63,99 +92,95 @@ int main() {
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
 
-    // tell GLFW to capture our mouse
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-    // glad: load all OpenGL function pointers
-    // ---------------------------------------
     if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
 
-    // tell stb_image.h to flip loaded texture's on the y-axis (before loading model).
     stbi_set_flip_vertically_on_load(true);
 
-    // configure global opengl state
-    // -----------------------------
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // build and compile shaders
-    // -------------------------
-    // Shader ourShader(FileSystem::getPath(R"(resources/1.model_loading.vert)").c_str(), FileSystem::getPath(R"(resources/1.model_loading.frag)").c_str());
-    Shader ourShader{
-        FileSystem::getPath(R"(resources/shader/037/assimp_demo.vert)").c_str(),
-        FileSystem::getPath(R"(resources/shader/037/assimp_demo.frag)").c_str()
+    Shader commonShader{
+        FileSystem::getPath(std::format(R"({}/common.vert)", SHARER_DIR)).c_str(),
+        FileSystem::getPath(std::format(R"({}/common.frag)", SHARER_DIR)).c_str()
+    };
+
+    Shader grassShader{
+        FileSystem::getPath(std::format(R"({}/common.vert)", SHARER_DIR)).c_str(),
+        FileSystem::getPath(std::format(R"({}/grass.frag)", SHARER_DIR)).c_str()
     };
 
 
-    // load models
-    // -----------
-    Model ourModel(FileSystem::getPath(R"(resources/objects/backpack/backpack.obj)"));
-    // Model ourModel{FileSystem::getPath(R"(resources/objects/brain/Brain_Model.obj)")};
-    // Model ourModel(FileSystem::getPath(R"(resources/objects/brain_areas/scene.gltf)"));
+    BoxMesh boxMesh;
+    WindowMesh windowMesh;
+    GrassMesh grassMesh;
 
-    // Model ourModel(FileSystem::getPath(R"(resources/objects/brain_project/scene.gltf)"));
-    // Model ourModel(FileSystem::getPath(R"(resources/objects/Human_Head.fbx)"));
-    // Model ourModel(FileSystem::getPath(R"(resources/objects/Woman_Head.obj)"));
-
-
-    // draw in wireframe
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-    // render loop
-    // -----------
     while (!glfwWindowShouldClose(window)) {
-        // per-frame time logic
-        // --------------------
         auto currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
-        // if (deltaTime < min_fgt)
-        // {
-        //     double sleepTime = min_fgt - deltaTime;
-        //     glfwWaitEventsTimeout(sleepTime); // 让线程等待剩余的时间
-        // }
+
         lastFrame = static_cast<float>(glfwGetTime());
 
-        // input
-        // -----
         processInput(window);
 
-        // render
-        // ------
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-        // don't forget to enable shader before setting uniforms
-        ourShader.use();
-        ourShader.setVec3("lightPos", glm::vec3(2.0f, 2.0f, 2.0f)); // 光源位置
-        ourShader.setVec3("viewPos", camera.Position); // 相机位置
-        ourShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f)); // 光源颜色（白色）
+        glEnable(GL_CULL_FACE);
 
-        // view/projection transformations
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
-        // glm::mat4 projection = glm::ortho(0.0f, 800.0f, 0.0f, 600.0f, 0.1f, 100.0f);
+        commonShader.use();
+        commonShader.setVec3("lightPos", glm::vec3(2.0f, 2.0f, 2.0f)); // 光源位置
+        commonShader.setVec3("viewPos", camera.Position); // 相机位置
+        commonShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f)); // 光源颜色（白色）
+
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
+                                                100.0f);
         glm::mat4 view = camera.GetViewMatrix();
-        ourShader.setMat4("projection", projection);
-        ourShader.setMat4("view", view);
+        commonShader.setMat4("projection", projection);
+        commonShader.setMat4("view", view);
 
-        // render the loaded model
-        glm::mat4 model = glm::mat4{1.0f};
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-        // translate it down so it's at the center of the scene
-        model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f)); // it's a bit too big for our scene, so scale it down
-        ourShader.setMat4("model", model);
-        ourModel.Draw(ourShader);
+        glm::mat4 model{};
+        for (const auto &box_po: boxPos) {
+            model = {1.0f};
+            model = glm::translate(model, box_po);
+            commonShader.setMat4("model", model);
+            boxMesh.Draw(commonShader);
+        }
 
+        glDisable(GL_CULL_FACE);
 
-        // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
-        // -------------------------------------------------------------------------------
+        grassShader.use();
+        grassShader.setMat4("projection", projection);
+        grassShader.setMat4("view", view);
+
+        for (const auto & grass_po : grassPos) {
+            model = {1.0f};
+            model = glm::translate(model, grass_po );
+            grassShader.setMat4("model", model);
+            grassMesh.Draw(grassShader);
+            model = glm::rotate(model, glm::radians(90.0f),  glm::vec3(0, 1, 0));
+            grassShader.setMat4("model", model);
+            grassMesh.Draw(grassShader);
+        }
+
+        commonShader.use();
+
+        for (const auto &window_po: windowPos) {
+            model = {1.0f};
+            model = glm::translate(model, window_po);
+            commonShader.setMat4("model", model);
+            windowMesh.Draw(commonShader);
+        }
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    // glfw: terminate, clearing all previously allocated GLFW resources.
-    // ------------------------------------------------------------------
     glfwTerminate();
     return 0;
 }

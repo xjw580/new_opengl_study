@@ -19,3 +19,8 @@ include(build)
 
 add_subdirectory(common)
 add_subdirectory(037_assimp_demo)
+add_subdirectory(038_depth_test)
+add_subdirectory(039_stencil_buffer)
+add_subdirectory(040_blend)
+add_subdirectory(041_face_culling)
+add_subdirectory(042_frame_buffers)
