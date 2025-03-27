@@ -2,4 +2,4 @@
 cmake-build-*
 /build
 CMakeLists.txt.user
-resources
+resources/objects
