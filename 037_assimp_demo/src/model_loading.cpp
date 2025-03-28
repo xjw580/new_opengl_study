@@ -91,8 +91,8 @@ int main() {
 
     // load models
     // -----------
-    Model ourModel(FileSystem::getPath(R"(resources/objects/backpack/backpack.obj)"));
-    // Model ourModel{FileSystem::getPath(R"(resources/objects/brain/Brain_Model.obj)")};
+    // Model ourModel(FileSystem::getPath(R"(resources/objects/backpack/backpack.obj)"));
+    Model ourModel{FileSystem::getPath(R"(resources/objects/brain/Brain_Model.obj)")};
     // Model ourModel(FileSystem::getPath(R"(resources/objects/brain_areas/scene.gltf)"));
 
     // Model ourModel(FileSystem::getPath(R"(resources/objects/brain_project/scene.gltf)"));

@@ -9,9 +9,9 @@
 #include <learnopengl/camera.h>
 #include <learnopengl/model.h>
 #include <filesystem.h>
+
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Delaunay_triangulation_3.h>
-
 #include <iostream>
 #include "common.h"
 #include "data.h"
@@ -111,7 +111,6 @@ int main() {
     stbi_set_flip_vertically_on_load(true);
 
     glEnable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_PROGRAM_POINT_SIZE);
 
@@ -120,46 +119,30 @@ int main() {
         FileSystem::getPath(std::format(R"({}/brain.frag)", SHARER_DIR)).c_str()
     };
 
-    constexpr int brainLength = 100;
-    // auto start = std::chrono::duration_cast<std::chrono::milliseconds>(
-    //     std::chrono::system_clock::now().time_since_epoch()
-    // );
-    // std::vector<BrainCommon::Electrode> electrodes;
-    //
-    // loadElectrode(electrodes, brainLength, brainLength, brainLength);
-    // Delaunay dt;
-    // for (const auto &electrode: electrodes) {
-    //     dt.insert(Point{electrode.x, electrode.y, electrode.z});
-    // }
-    // for (int y = 0; y < brainLength; y++) {
-    //     for (int z = 0; z < brainLength; z++) {
-    //         for (int x = 0; x < brainLength; x++) {
-    //             auto nearestVertex = dt.nearest_vertex(Point{x, y, z});
-    //             auto point = nearestVertex->point();
-    //             // cout << point.x() << ", " << point.y() << ", " << point.z() << endl;
-    //         }
-    //     }
-    // }
-    // auto end = std::chrono::duration_cast<std::chrono::milliseconds>(
-    //     std::chrono::system_clock::now().time_since_epoch()
-    // );
-    // cout << "calc time:" << (end - start).count() << "ms" << std::endl;
+    Shader commonShader{
+        FileSystem::getPath(std::format(R"({}/common.vert)", SHARER_DIR)).c_str(),
+        FileSystem::getPath(std::format(R"({}/common.frag)", SHARER_DIR)).c_str()
+    };
 
+    Model brainModel{FileSystem::getPath(R"(resources/objects/brain/Brain_Model.obj)")};
+
+    constexpr int brainLength = 100;
     std::vector<float> values;
     test(values, brainLength, brainLength, brainLength);
     float minValue = values[0];
     float maxValue = values[0];
     std::vector<GLfloat> vertices(brainLength * brainLength * brainLength * 4);
     int index = 0;
+    float half = brainLength / 2.0f;
     for (int z = 0; z < brainLength; z++) {
         for (int y = 0; y < brainLength; y++) {
             for (int x = 0; x < brainLength; x++) {
                 auto v = values[x + y * brainLength + z * brainLength * brainLength];
                 minValue = std::min(minValue, v);
                 maxValue = std::max(maxValue, v);
-                vertices[index++] = static_cast<float>(x);
+                vertices[index++] = static_cast<float>(x) - half;
                 vertices[index++] = static_cast<float>(y);
-                vertices[index++] = static_cast<float>(z);
+                vertices[index++] = static_cast<float>(z) - half;
                 vertices[index++] = v;
             }
         }
@@ -181,12 +164,67 @@ int main() {
 
     // 设置顶点属性
     // 位置属性
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void *) 0);
     glEnableVertexAttribArray(0);
 
     // 强度属性
-    glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+    glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void *) (3 * sizeof(GLfloat)));
     glEnableVertexAttribArray(1);
+
+    // 帧缓冲
+
+    Shader screenShader{
+        FileSystem::getPath(std::format(R"({}/screen.vert)", SHARER_DIR)).c_str(),
+        FileSystem::getPath(std::format(R"({}/screen.frag)", SHARER_DIR)).c_str()
+    };
+    // framebuffer configuration
+    // -------------------------
+    unsigned int framebuffer;
+    glGenFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    // create a color attachment texture
+    unsigned int textureColorbuffer;
+    glGenTextures(1, &textureColorbuffer);
+    glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorbuffer, 0);
+    // create a renderbuffer object for depth and stencil attachment (we won't be sampling these)
+    unsigned int rbo;
+    glGenRenderbuffers(1, &rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT); // use a single renderbuffer object for both a depth AND stencil buffer.
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo); // now actually attach it
+    // now that we actually created the framebuffer and added all attachments we want to check if it is actually complete now
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+    // 创建一个简单的全屏四边形
+    float quadVertices[] = {
+        // 位置        // 纹理坐标
+        -1.0f,  1.0f, 0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f, 0.0f,
+         1.0f, -1.0f, 1.0f, 0.0f,
+
+        -1.0f,  1.0f, 0.0f, 1.0f,
+         1.0f, -1.0f, 1.0f, 0.0f,
+         1.0f,  1.0f, 1.0f, 1.0f
+    };
+
+    unsigned int quadVAO, quadVBO;
+    glGenVertexArrays(1, &quadVAO);
+    glBindVertexArray(quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 
     while (!glfwWindowShouldClose(window)) {
         auto currentFrame = static_cast<float>(glfwGetTime());
@@ -195,24 +233,56 @@ int main() {
         lastFrame = static_cast<float>(glfwGetTime());
 
         processInput(window);
+        // 离屏渲染
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        brainShader.use();
-
+        // 渲染脑模型
+        glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_STENCIL_TEST);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+        glStencilFunc(GL_ALWAYS, 1, 0xFF); // 所有的片段都应该更新模板缓冲
+        glStencilMask(0xFF);
+        glm::mat4 model;
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
                                                 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
+        commonShader.use();
+        commonShader.setMat4("projection", projection);
+        commonShader.setMat4("view", view);
+        model = {1.0f};
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+        commonShader.setMat4("model", model);
+        commonShader.setFloat("volumeScale", 1.0f / brainLength);
+        brainModel.Draw(commonShader);
+
+        // 渲染值
+        glStencilFunc(GL_EQUAL, 1, 0xFF);
+        glStencilMask(0x00); // 禁止模板缓冲的写入
+        glDisable(GL_DEPTH_TEST);
+        brainShader.use();
         brainShader.setMat4("projection", projection);
         brainShader.setMat4("view", view);
-        glm::mat4 model{1.0f};
+        model = {1.0f};
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
         brainShader.setMat4("model", model);
-        brainShader.setFloat("volumeScale", 1.0f/brainLength);
-
+        brainShader.setFloat("volumeScale", 1.0f / brainLength);
         glBindVertexArray(VAO);
         glDrawArrays(GL_POINTS, 0, values.size());
+        glStencilMask(0xff);
+        glDisable(GL_STENCIL_TEST);
+
+        // 渲染到屏幕
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
+        // clear all relevant buffers
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // set clear color to white (not really necessary actually, since we won't be able to see behind the quad anyways)
+        glClear(GL_COLOR_BUFFER_BIT);
+        screenShader.use();
+        glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
+        glBindVertexArray(quadVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

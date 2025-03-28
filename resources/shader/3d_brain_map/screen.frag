@@ -5,105 +5,53 @@ in vec2 TexCoords;
 
 uniform sampler2D screenTexture;
 
+vec2 texelSize = vec2(1/100.0, 1/100.0);
+int blurRadius = 10;
+float pointSize = 1.0;// 点的大小
+vec2 resolution = vec2(100, 100);// 屏幕分辨率
+
 void main() {
-    // 基本的纹理渲染
-    vec3 color = texture(screenTexture, TexCoords).rgb;
-
-    // 灰度效果
-    // float average = (color.r + color.g + color.b) / 3.0;
-    // FragColor = vec4(average, average, average, 1.0);
-
-    // 反相效果
-//     FragColor = vec4(1.0 - color, 1.0);
-
-    // 模糊效果
-//     const float offset = 1.0 / 300.0;
-//     vec2 offsets[9] = vec2[](
-//         vec2(-offset,  offset), // 左上
-//         vec2( 0.0f,    offset), // 正上
-//         vec2( offset,  offset), // 右上
-//         vec2(-offset,  0.0f),   // 左
-//         vec2( 0.0f,    0.0f),   // 中
-//         vec2( offset,  0.0f),   // 右
-//         vec2(-offset, -offset), // 左下
-//         vec2( 0.0f,   -offset), // 正下
-//         vec2( offset, -offset)  // 右下
-//     );
+    vec2 pixelCoords = TexCoords * resolution;
+    vec4 centerColor = texture(screenTexture, TexCoords);
 //
-//     float blurKernel[9] = float[](
-//         1.0/9.0, 1.0/9.0, 1.0/9.0,
-//         1.0/9.0, 1.0/9.0, 1.0/9.0,
-//         1.0/9.0, 1.0/9.0, 1.0/9.0
-//     );
-//
-//     vec3 sampleTex[9];
-//     for(int i = 0; i < 9; i++) {
-//         sampleTex[i] = vec3(texture(screenTexture, TexCoords.st + offsets[i]));
-//     }
-//     vec3 blurColor = vec3(0.0);
-//     for(int i = 0; i < 9; i++)
-//         blurColor += sampleTex[i] * blurKernel[i];
-//     FragColor = vec4(blurColor, 1.0);
-
-    // 锐化效果
-    // const float offset = 1.0 / 300.0;
-    // vec2 offsets[9] = vec2[](
-    //     vec2(-offset,  offset), // 左上
-    //     vec2( 0.0f,    offset), // 正上
-    //     vec2( offset,  offset), // 右上
-    //     vec2(-offset,  0.0f),   // 左
-    //     vec2( 0.0f,    0.0f),   // 中
-    //     vec2( offset,  0.0f),   // 右
-    //     vec2(-offset, -offset), // 左下
-    //     vec2( 0.0f,   -offset), // 正下
-    //     vec2( offset, -offset)  // 右下
-    // );
-    //
-    // float sharpenKernel[9] = float[](
-    //     -1, -1, -1,
-    //     -1,  9, -1,
-    //     -1, -1, -1
-    // );
-    //
-    // vec3 sampleTex[9];
-    // for(int i = 0; i < 9; i++) {
-    //     sampleTex[i] = vec3(texture(screenTexture, TexCoords.st + offsets[i]));
-    // }
-    // vec3 sharpenColor = vec3(0.0);
-    // for(int i = 0; i < 9; i++)
-    //     sharpenColor += sampleTex[i] * sharpenKernel[i];
-    // FragColor = vec4(sharpenColor, 1.0);
-
-    // 边缘检测效果
-//    const float offset = 1.0 / 300.0;
-//    vec2 offsets[9] = vec2[](
-//    vec2(-offset,  offset), // 左上
-//    vec2( 0.0f,    offset), // 正上
-//    vec2( offset,  offset), // 右上
-//    vec2(-offset,  0.0f),   // 左
-//    vec2( 0.0f,    0.0f),   // 中
-//    vec2( offset,  0.0f),   // 右
-//    vec2(-offset, -offset), // 左下
-//    vec2( 0.0f,   -offset), // 正下
-//    vec2( offset, -offset)  // 右下
-//    );
-//
-//    float kernel[9] = float[](
-//    1,  1, 1,
-//    1, -8, 1,
-//    1,  1, 1
-//    );
-//
-//    vec3 sampleTex[9];
-//    for(int i = 0; i < 9; i++) {
-//        sampleTex[i] = vec3(texture(screenTexture, TexCoords.st + offsets[i]));
+//    // 如果是空白区域，直接返回透明
+//    if (centerColor.a < 0.01) {
+//        FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+//        return;
 //    }
-//    vec3 col = vec3(0.0);
-//    for(int i = 0; i < 9; i++)
-//    col += sampleTex[i] * kernel[i];
 //
-//    FragColor = vec4(col, 1.0);
+//    vec3 result = vec3(0.0);
+//    float totalWeight = 0.0;
+//
+//    // 计算点的半径（像素）
+//    float halfPointSize = pointSize / 2.0;
+//
+//    // 高斯模糊
+//    for (int x = -blurRadius; x <= blurRadius; ++x) {
+//        for (int y = -blurRadius; y <= blurRadius; ++y) {
+//            vec2 offset = vec2(x, y) * texelSize;
+//            vec2 sampleCoords = TexCoords + offset;
+//            vec4 sampleColor = texture(screenTexture, sampleCoords);
+//
+//            // 只计算在点范围内的像素
+//            vec2 samplePixelCoords = sampleCoords * resolution;
+//            float distToCenter = distance(pixelCoords, samplePixelCoords);
+//
+//            if (distToCenter <= halfPointSize && sampleColor.a > 0.01) {
+//                float weight = exp(-(x*x + y*y) / (2.0 * blurRadius * blurRadius));
+//                result += sampleColor.rgb * weight;
+//                totalWeight += weight;
+//            }
+//        }
+//    }
+//
+//    // 防止除零
+//    if (totalWeight > 0.0) {
+//        result /= totalWeight;
+//        FragColor = vec4(result, 1.0);
+//    } else {
+//        FragColor = centerColor;
+//    }
 
-    // 默认直接渲染
-     FragColor = vec4(color, 1.0);
+    FragColor = centerColor;
 }

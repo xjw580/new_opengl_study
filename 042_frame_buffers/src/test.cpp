@@ -115,12 +115,15 @@ int main() {
         FileSystem::getPath(std::format(R"({}/grass.frag)", SHARER_DIR)).c_str()
     };
 
+    BoxMesh boxMesh;
+    WindowMesh windowMesh;
+    GrassMesh grassMesh;
+    FloorMesh floorMesh;
+
     Shader screenShader{
         FileSystem::getPath(std::format(R"({}/screen.vert)", SHARER_DIR)).c_str(),
         FileSystem::getPath(std::format(R"({}/screen.frag)", SHARER_DIR)).c_str()
     };
-
-
     // framebuffer configuration
     // -------------------------
     unsigned int framebuffer;
@@ -146,11 +149,6 @@ int main() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 
-    BoxMesh boxMesh;
-    WindowMesh windowMesh;
-    GrassMesh grassMesh;
-    FloorMesh floorMesh;
-
     // 创建一个简单的全屏四边形
     float quadVertices[] = {
         // 位置        // 纹理坐标
@@ -165,7 +163,15 @@ int main() {
 
     unsigned int quadVAO, quadVBO;
     glGenVertexArrays(1, &quadVAO);
+    glBindVertexArray(quadVAO);
     glGenBuffers(1, &quadVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 
     while (!glfwWindowShouldClose(window)) {
         auto currentFrame = static_cast<float>(glfwGetTime());
@@ -240,18 +246,7 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT);
         screenShader.use();
         glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
-
-
         glBindVertexArray(quadVAO);
-
-        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
-
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
