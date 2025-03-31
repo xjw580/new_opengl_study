@@ -19,6 +19,7 @@ include(build)
 
 add_subdirectory(common)
 add_subdirectory(3d_brain_map)
+add_subdirectory(3d_brain_map_test)
 add_subdirectory(037_assimp_demo)
 add_subdirectory(038_depth_test)
 add_subdirectory(039_stencil_buffer)

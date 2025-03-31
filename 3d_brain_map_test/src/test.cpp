@@ -15,7 +15,6 @@
 #include <iostream>
 #include "common.h"
 #include "data.h"
-#include "blur.h"
 #include "meshs/BoxMesh.h"
 #include "meshs/WindowMesh.h"
 #include "meshs/GrassMesh.h"
@@ -60,7 +59,7 @@ float min_fgt = 1.0f / frame;
 //
 // 另外一个很好的技巧是牺牲一些性能，使用更高精度的深度缓冲。大部分深度缓冲的精度都是24位的，但现在大部分的显卡都支持32位的深度缓冲，这将会极大地提高精度。所以，牺牲掉一些性能，你就能获得更高精度的深度测试，减少深度冲突。
 
-#define SHARER_DIR "resources/shader/3d_brain_map"
+#define SHARER_DIR "resources/shader/3d_brain_map_test"
 
 auto boxPos = std::vector<glm::vec3>{
     glm::vec3{0.0f, 0.0f, -1.0f},
@@ -81,136 +80,20 @@ auto grassPos = std::vector<glm::vec3>{
     glm::vec3{1.0f, 0.0f, 2.5},
 };
 
-void smoothValues(std::vector<GLfloat> &vertices, int width, int height, int depth, int iterations = 5) {
-    // Create a copy of the original v values
-    std::vector<GLfloat> smoothedValues(width * height * depth);
+glm::vec3 mapToColor(float v) {
+    v = glm::clamp(v, 0.0f, 1.0f); // 保证 v 在 [0, 1] 之间
 
-    // Extract v values from vertices
-    for (int i = 0; i < width * height * depth; i++) {
-        smoothedValues[i] = vertices[i * 4 + 3]; // v component is at index 3
+    // 颜色映射：从蓝色 -> 绿色 -> 红色
+    glm::vec3 color;
+    if (v < 0.5f) {
+        // 蓝色 -> 绿色
+        color = glm::mix(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), v * 2.0f);
+    } else {
+        // 绿色 -> 红色
+        color = glm::mix(glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), (v - 0.5f) * 2.0f);
     }
 
-    // Perform smoothing iterations
-    for (int iter = 0; iter < iterations; iter++) {
-        std::vector<GLfloat> newValues = smoothedValues;
-
-        for (int z = 1; z < depth - 1; z++) {
-            for (int y = 1; y < height - 1; y++) {
-                for (int x = 1; x < width - 1; x++) {
-                    int idx = x + y * width + z * width * height;
-
-                    // Calculate average of neighbors (6-neighborhood)
-                    float sum = 0.0f;
-                    sum += smoothedValues[idx - 1]; // -x
-                    sum += smoothedValues[idx + 1]; // +x
-                    sum += smoothedValues[idx - width]; // -y
-                    sum += smoothedValues[idx + width]; // +y
-                    sum += smoothedValues[idx - width * height]; // -z
-                    sum += smoothedValues[idx + width * height]; // +z
-
-                    // Update value (lambda controls smoothing strength, 0.0-1.0)
-                    float lambda = 0.5f;
-                    newValues[idx] = (1.0f - lambda) * smoothedValues[idx] +
-                                     (lambda / 6.0f) * sum;
-                }
-            }
-        }
-
-        smoothedValues = newValues;
-    }
-
-    // Write smoothed values back to the original vertices array
-    for (int i = 0; i < width * height * depth; i++) {
-        vertices[i * 4 + 3] = smoothedValues[i];
-    }
-}
-
-// 三线性插值函数
-float trilinearInterpolate(const std::vector<GLfloat> &vertices,
-                           int width, int height, int depth,
-                           float x, float y, float z) {
-    int x0 = floor(x);
-    int y0 = floor(y);
-    int z0 = floor(z);
-    int x1 = x0 + 1;
-    int y1 = y0 + 1;
-    int z1 = z0 + 1;
-
-    // 确保索引在边界内
-    x0 = std::max(0, std::min(x0, width - 1));
-    y0 = std::max(0, std::min(y0, height - 1));
-    z0 = std::max(0, std::min(z0, depth - 1));
-    x1 = std::max(0, std::min(x1, width - 1));
-    y1 = std::max(0, std::min(y1, height - 1));
-    z1 = std::max(0, std::min(z1, depth - 1));
-
-    // 获取八个顶点的值
-    float v000 = vertices[(x0 + y0 * width + z0 * width * height) * 4 + 3];
-    float v001 = vertices[(x0 + y0 * width + z1 * width * height) * 4 + 3];
-    float v010 = vertices[(x0 + y1 * width + z0 * width * height) * 4 + 3];
-    float v011 = vertices[(x0 + y1 * width + z1 * width * height) * 4 + 3];
-    float v100 = vertices[(x1 + y0 * width + z0 * width * height) * 4 + 3];
-    float v101 = vertices[(x1 + y0 * width + z1 * width * height) * 4 + 3];
-    float v110 = vertices[(x1 + y1 * width + z0 * width * height) * 4 + 3];
-    float v111 = vertices[(x1 + y1 * width + z1 * width * height) * 4 + 3];
-
-    // 计算插值权重
-    float xd = x - x0;
-    float yd = y - y0;
-    float zd = z - z0;
-
-    // 三线性插值
-    float c00 = v000 * (1 - xd) + v100 * xd;
-    float c01 = v001 * (1 - xd) + v101 * xd;
-    float c10 = v010 * (1 - xd) + v110 * xd;
-    float c11 = v011 * (1 - xd) + v111 * xd;
-
-    float c0 = c00 * (1 - yd) + c10 * yd;
-    float c1 = c01 * (1 - yd) + c11 * yd;
-
-    return c0 * (1 - zd) + c1 * zd;
-}
-
-// 应用于整个数据集
-void applyTrilinearSmoothing(std::vector<GLfloat> &vertices, int width, int height, int depth) {
-    std::vector<GLfloat> smoothed(vertices.size());
-
-    // 拷贝所有非v值
-    for (int i = 0; i < width * height * depth; i++) {
-        smoothed[i * 4] = vertices[i * 4]; // x
-        smoothed[i * 4 + 1] = vertices[i * 4 + 1]; // y
-        smoothed[i * 4 + 2] = vertices[i * 4 + 2]; // z
-    }
-
-    // 对每个点应用三线性插值
-    for (int z = 0; z < depth; z++) {
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                // 计算周围的平均坐标 (添加小偏移以获取平滑效果)
-                float sx = x + 0.5f;
-                float sy = y + 0.5f;
-                float sz = z + 0.5f;
-
-                // 应用插值获取平滑值
-                float smoothValue = trilinearInterpolate(vertices, width, height, depth, sx, sy, sz);
-
-                // 存储平滑后的值
-                smoothed[(x + y * width + z * width * height) * 4 + 3] = smoothValue;
-            }
-        }
-    }
-
-    // 更新原始数据
-    vertices = smoothed;
-}
-
-// 组合方法
-void combinedSmoothing(std::vector<GLfloat> &vertices, int width, int height, int depth) {
-    // 首先应用三线性插值来处理分块现象
-    applyTrilinearSmoothing(vertices, width, height, depth);
-
-    // 然后应用一次轻度拉普拉斯平滑来进一步增强平滑效果
-    smoothValues(vertices, width, height, depth, 2); // 只需要几次迭代
+    return color;
 }
 
 int main() {
@@ -265,6 +148,7 @@ int main() {
     float minValue = values[0];
     float maxValue = values[0];
     std::vector<GLfloat> vertices(brainLength * brainLength * brainLength * 4);
+    std::vector<GLfloat> colors(brainLength * brainLength * brainLength * 4);
     int index = 0;
     float half = brainLength / 2.0f;
     for (int z = 0; z < brainLength; z++) {
@@ -282,13 +166,19 @@ int main() {
         }
     }
     // 标准化强度值
+    int cI = 0;
     for (size_t i = 3; i < vertices.size(); i += 4) {
         vertices[i] = (vertices[i] - minValue) / (maxValue - minValue);
+        auto color = mapToColor(vertices[i]);
+        colors[cI++] = color.r;
+        colors[cI++] = color.g;
+        colors[cI++] = color.b;
+        // colors[cI++] = 0.5;
+        // colors[cI++] = 0.5;
+        // colors[cI++] = 0.5;
+        colors[cI++] = 0.5;
     }
 
-    blurVertices(vertices, brainLength, brainLength, brainLength, 5.0, 3);
-    // Assuming vertices is your std::vector<GLfloat> with size 100*100*100*4
-    // combinedSmoothing(vertices, 100, 100, 100);
     // 创建VAO和VBO
     GLuint VAO, VBO;
     glGenVertexArrays(1, &VAO);
@@ -314,6 +204,11 @@ int main() {
         FileSystem::getPath(std::format(R"({}/screen.vert)", SHARER_DIR)).c_str(),
         FileSystem::getPath(std::format(R"({}/screen.frag)", SHARER_DIR)).c_str()
     };
+
+    Shader volumeShader{
+        FileSystem::getPath(std::format(R"({}/volume.vert)", SHARER_DIR)).c_str(),
+        FileSystem::getPath(std::format(R"({}/volume.frag)", SHARER_DIR)).c_str()
+    };
     // framebuffer configuration
     // -------------------------
     unsigned int framebuffer;
@@ -331,39 +226,56 @@ int main() {
     unsigned int rbo;
     glGenRenderbuffers(1, &rbo);
     glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
-    // use a single renderbuffer object for both a depth AND stencil buffer.
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-    // now actually attach it
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT); // use a single renderbuffer object for both a depth AND stencil buffer.
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo); // now actually attach it
     // now that we actually created the framebuffer and added all attachments we want to check if it is actually complete now
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 
-    // 创建一个简单的全屏四边形
-    float quadVertices[] = {
-        // 位置        // 纹理坐标
-        -1.0f, 1.0f, 0.0f, 1.0f,
+    float vertices1[] = {
+        // 位置       // 纹理坐标
         -1.0f, -1.0f, 0.0f, 0.0f,
-        1.0f, -1.0f, 1.0f, 0.0f,
-
-        -1.0f, 1.0f, 0.0f, 1.0f,
-        1.0f, -1.0f, 1.0f, 0.0f,
-        1.0f, 1.0f, 1.0f, 1.0f
+         1.0f, -1.0f, 1.0f, 0.0f,
+        -1.0f,  1.0f, 0.0f, 1.0f,
+         1.0f,  1.0f, 1.0f, 1.0f
     };
 
-    unsigned int quadVAO, quadVBO;
+    GLuint quadVAO, quadVBO;
     glGenVertexArrays(1, &quadVAO);
-    glBindVertexArray(quadVAO);
     glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
     glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices1), vertices1, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *) 0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *) (2 * sizeof(float)));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+
+    GLuint volumeTexture;
+    glGenTextures(1, &volumeTexture);
+    glBindTexture(GL_TEXTURE_3D, volumeTexture);
+    // 设置纹理参数
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    // 上传纹理数据
+    glTexImage3D(GL_TEXTURE_3D,
+                 0,                 // 细节层次
+                 GL_RGBA32F,        // 内部格式
+                 brainLength,brainLength,brainLength,
+                 0,                 // 边框
+                 GL_RGBA,           // 数据格式
+                 GL_FLOAT,          // 数据类型
+                 colors.data());      // 数据指针
 
     while (!glfwWindowShouldClose(window)) {
         auto currentFrame = static_cast<float>(glfwGetTime());
@@ -372,61 +284,82 @@ int main() {
         lastFrame = static_cast<float>(glfwGetTime());
 
         processInput(window);
-        // 离屏渲染
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
-        // 渲染脑模型
-        glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
-        glEnable(GL_STENCIL_TEST);
-        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-        glStencilFunc(GL_ALWAYS, 1, 0xFF); // 所有的片段都应该更新模板缓冲
-        glStencilMask(0xFF);
-        glm::mat4 model;
+        glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // 渲染循环中
+        volumeShader.use();
+        glBindVertexArray(quadVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_3D, volumeTexture);
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
                                                 100.0f);
-        // glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(SCR_WIDTH), static_cast<float>(SCR_HEIGHT), 0.0f, -3.0f, 3.0f);
         glm::mat4 view = camera.GetViewMatrix();
-        commonShader.use();
-        commonShader.setMat4("projection", projection);
-        commonShader.setMat4("view", view);
-        model = {1.0f};
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-        float scale = 0.75;
-        model = glm::scale(model, glm::vec3(scale, scale, scale));
-        commonShader.setMat4("model", model);
-        commonShader.setFloat("volumeScale", 1.0f / brainLength);
-        brainModel.Draw(commonShader);
+        volumeShader.setMat4("projection", projection);
+        volumeShader.setMat4("view", view);
+        // 沿z轴绘制多个切片
+        int numSlices = 100;
+        for(int i = 0; i < numSlices; i++) {
+            float z = -1.0f + 2.0f * float(i) / float(numSlices - 1);
 
-        // 渲染值
-        glStencilFunc(GL_EQUAL, 1, 0xFF);
-        // glStencilFunc(GL_ALWAYS, 1, 0xFF);
-        glStencilMask(0x00); // 禁止模板缓冲的写入
+            glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, z));
+            volumeShader.setMat4("model", model);
+
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        }
+
+        // // 离屏渲染
+        // glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        //
+        // // 渲染脑模型
+        // glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        // glEnable(GL_DEPTH_TEST);
+        // glEnable(GL_STENCIL_TEST);
+        // glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+        // glStencilFunc(GL_ALWAYS, 1, 0xFF); // 所有的片段都应该更新模板缓冲
+        // glStencilMask(0xFF);
+        // glm::mat4 model;
+        // glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
+        //                                         100.0f);
+        // glm::mat4 view = camera.GetViewMatrix();
+        // commonShader.use();
+        // commonShader.setMat4("projection", projection);
+        // commonShader.setMat4("view", view);
+        // model = {1.0f};
+        // model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+        // commonShader.setMat4("model", model);
+        // commonShader.setFloat("volumeScale", 1.0f / brainLength);
+        // brainModel.Draw(commonShader);
+        //
+        // // 渲染值
+        // glStencilFunc(GL_EQUAL, 1, 0xFF);
+        // glStencilMask(0x00); // 禁止模板缓冲的写入
         // glDisable(GL_DEPTH_TEST);
-        brainShader.use();
-        brainShader.setMat4("projection", projection);
-        brainShader.setMat4("view", view);
-        model = {1.0f};
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-        brainShader.setMat4("model", model);
-        brainShader.setFloat("volumeScale", 1.0f / brainLength);
-        glBindVertexArray(VAO);
-        glDrawArrays(GL_POINTS, 0, values.size());
-        glStencilMask(0xff);
-        glDisable(GL_STENCIL_TEST);
-
-        // 渲染到屏幕
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
-        // clear all relevant buffers
-        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-        // set clear color to white (not really necessary actually, since we won't be able to see behind the quad anyways)
-        glClear(GL_COLOR_BUFFER_BIT);
-        screenShader.use();
-        glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
-        glBindVertexArray(quadVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        // brainShader.use();
+        // brainShader.setMat4("projection", projection);
+        // brainShader.setMat4("view", view);
+        // model = {1.0f};
+        // model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+        // brainShader.setMat4("model", model);
+        // brainShader.setFloat("volumeScale", 1.0f / brainLength);
+        // glBindVertexArray(VAO);
+        // glDrawArrays(GL_POINTS, 0, values.size());
+        // glStencilMask(0xff);
+        // glDisable(GL_STENCIL_TEST);
+        //
+        // // 渲染到屏幕
+        // glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        // glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
+        // // clear all relevant buffers
+        // glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // set clear color to white (not really necessary actually, since we won't be able to see behind the quad anyways)
+        // glClear(GL_COLOR_BUFFER_BIT);
+        // screenShader.use();
+        // glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
+        // glBindVertexArray(quadVAO);
+        // glDrawArrays(GL_TRIANGLES, 0, 6);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

@@ -38,7 +38,7 @@ void main()
     //    vec4 specular = vec4(spec * lightColor, 1.0);
 
     //    FragColor = diffuse + specular;
-//        FragColor = albedo;
+    //    FragColor = albedo;
     FragColor = vec4(0, 0, 0, 0);
     //    discard;
 }
