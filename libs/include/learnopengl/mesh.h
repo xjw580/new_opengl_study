@@ -11,7 +11,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-using namespace std;
 
 #define MAX_BONE_INFLUENCE 4
 
@@ -34,20 +33,20 @@ struct Vertex {
 
 struct Texture {
     unsigned int id;
-    string type;
+    std::string type;
     aiString path;
 };
 
 class Mesh {
 public:
     // mesh Data
-    vector<Vertex> vertices;
-    vector<unsigned int> indices;
-    vector<Texture> textures;
+    std::vector<Vertex> vertices;
+    std::vector<unsigned int> indices;
+    std::vector<Texture> textures;
     unsigned int VAO{};
 
     // constructor
-    Mesh(const vector<GLfloat> &vertices, vector<unsigned int> &indices, const vector<Texture> &textures) {
+    Mesh(const std::vector<GLfloat> &vertices, std::vector<unsigned int> &indices, const std::vector<Texture> &textures) {
         for (unsigned int i = 0; i < vertices.size();) {
             this->vertices.push_back(Vertex{
                 glm::vec3{vertices[i++], vertices[i++], vertices[i++]},
@@ -63,7 +62,7 @@ public:
     }
 
     // constructor
-    Mesh(const vector<Vertex> &vertices, const vector<unsigned int> &indices, const vector<Texture> &textures) {
+    Mesh(const std::vector<Vertex> &vertices, const std::vector<unsigned int> &indices, const std::vector<Texture> &textures) {
         this->vertices = vertices;
         this->indices = indices;
         this->textures = textures;
@@ -82,8 +81,8 @@ public:
         for (unsigned int i = 0; i < textures.size(); i++) {
             glActiveTexture(GL_TEXTURE0 + i); // active proper texture unit before binding
             // retrieve texture number (the N in diffuse_textureN)
-            string number;
-            string name = textures[i].type;
+            std::string number;
+            std::string name = textures[i].type;
             if (name == "texture_diffuse")
                 number = std::to_string(diffuseNr++);
             else if (name == "texture_specular")

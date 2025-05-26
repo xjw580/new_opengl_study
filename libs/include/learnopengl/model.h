@@ -19,21 +19,20 @@
 #include <iostream>
 #include <map>
 #include <vector>
-using namespace std;
 
-unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false,
+unsigned int TextureFromFile(const char *path, const std::string &directory, bool gamma = false,
                              GLint wrapParam = GL_REPEAT);
 
 unsigned int CreateDefaultTexture();
 
 class Model {
 public:
-    vector<Texture> textures_loaded;
-    vector<Mesh> meshes;
-    string directory;
+    std::vector<Texture> textures_loaded;
+    std::vector<Mesh> meshes;
+    std::string directory;
     bool gammaCorrection;
 
-    Model(string const &path, bool gamma = false) : gammaCorrection(gamma) {
+    Model(std::string const &path, bool gamma = false) : gammaCorrection(gamma) {
         loadModel(path);
     }
 
@@ -43,7 +42,7 @@ public:
     }
 
 private:
-    void loadModel(string const &path) {
+    void loadModel(std::string const &path) {
         Assimp::Importer importer;
         // 增加 GLTF 支持，确保加载材质和纹理
         const aiScene *scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals |
@@ -51,7 +50,7 @@ private:
                                                        aiProcess_JoinIdenticalVertices |
                                                        aiProcess_ValidateDataStructure);
         if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-            cout << "ERROR::ASSIMP:: " << importer.GetErrorString() << endl;
+            std::cout << "ERROR::ASSIMP:: " << importer.GetErrorString() << std::endl;
             return;
         }
         const std::filesystem::path filePath = path;
@@ -70,9 +69,9 @@ private:
     }
 
     Mesh processMesh(aiMesh *mesh, const aiScene *scene) {
-        vector<Vertex> vertices;
-        vector<unsigned int> indices;
-        vector<Texture> textures;
+        std::vector<Vertex> vertices;
+        std::vector<unsigned int> indices;
+        std::vector<Texture> textures;
 
         for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
             Vertex vertex;
@@ -90,7 +89,7 @@ private:
                 vertex.Normal = vector;
             } else {
                 vertex.Normal = glm::vec3(0.0f, 0.0f, 1.0f); // 默认法线
-                cout << "Warning: Mesh has no normals, using default.\n";
+                std::cout << "Warning: Mesh has no normals, using default.\n";
             }
 
             if (mesh->mTextureCoords[0]) {
@@ -100,7 +99,7 @@ private:
                 vertex.TexCoords = vec;
             } else {
                 vertex.TexCoords = glm::vec2(0.0f, 0.0f);
-                cout << "Warning: Mesh has no texture coordinates, using default (0,0).\n";
+                std::cout << "Warning: Mesh has no texture coordinates, using default (0,0).\n";
             }
 
             vertices.push_back(vertex);
@@ -115,11 +114,11 @@ private:
         if (scene->HasMaterials() && mesh->mMaterialIndex >= 0) {
             aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
             // 加载漫反射贴图
-            vector<Texture> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
+            std::vector<Texture> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
             textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
 
             // 加载镜面贴图
-            vector<Texture> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
+            std::vector<Texture> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
             textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
 
             // // 加载法线贴图（GLTF 可能使用 aiTextureType_NORMALS）
@@ -135,7 +134,7 @@ private:
             // textures.insert(textures.end(), displacementMaps.begin(), displacementMaps.end());
 
             if (textures.empty()) {
-                cout << "No textures found for mesh, using default texture.\n";
+                std::cout << "No textures found for mesh, using default texture.\n";
                 Texture defaultTexture;
                 defaultTexture.id = CreateDefaultTexture();
                 defaultTexture.type = "texture_diffuse";
@@ -144,7 +143,7 @@ private:
                 textures_loaded.push_back(defaultTexture);
             }
         } else {
-            cout << "No material found for this mesh, using default texture.\n";
+            std::cout << "No material found for this mesh, using default texture.\n";
             Texture defaultTexture;
             defaultTexture.id = CreateDefaultTexture();
             defaultTexture.type = "texture_diffuse";
@@ -156,8 +155,8 @@ private:
         return Mesh(vertices, indices, textures);
     }
 
-    vector<Texture> loadMaterialTextures(aiMaterial *mat, aiTextureType type, const string &typeName) {
-        vector<Texture> textures;
+    std::vector<Texture> loadMaterialTextures(aiMaterial *mat, aiTextureType type, const std::string &typeName) {
+        std::vector<Texture> textures;
         for (unsigned int i = 0; i < mat->GetTextureCount(type); i++) {
             aiString str;
             mat->GetTexture(type, i, &str);
@@ -199,9 +198,9 @@ unsigned int CreateDefaultTexture() {
     return textureID;
 }
 
-unsigned int TextureFromFile(const char *path, const string &directory, bool gamma, GLint wrapParam) {
-    string filename = string(path);
-    if (filename.find('/') == string::npos && filename.find('\\') == string::npos) // 相对路径
+unsigned int TextureFromFile(const char *path, const std::string &directory, bool gamma, GLint wrapParam) {
+    std::string filename = std::string(path);
+    if (filename.find('/') == std::string::npos && filename.find('\\') == std::string::npos) // 相对路径
     {
         filename = directory + '/' + filename;
     }
@@ -231,7 +230,7 @@ unsigned int TextureFromFile(const char *path, const string &directory, bool gam
 
         stbi_image_free(data);
     } else {
-        cout << "Texture failed to load at path: " << filename << ". Using default texture.\n";
+        std::cout << "Texture failed to load at path: " << filename << ". Using default texture.\n";
         textureID = CreateDefaultTexture();
     }
 

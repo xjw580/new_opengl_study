@@ -38,6 +38,7 @@ void main()
     vec3 specular = spec * lightColor;
 
         FragColor = vec4(diffuse + specular, 1.0);
+//        FragColor = vec4(albedo, 1.0);
     // 颜色基于坐标
 //    FragColor = vec4(vec3(gl_FragCoord.z), 1.0);
 }

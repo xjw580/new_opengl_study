@@ -8,4 +8,5 @@ target_link_libraries(${PROJECT_NAME}
         glfw3
         common
         assimp-vc143-mt
+        pdh
 )
