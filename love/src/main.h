@@ -51,7 +51,7 @@ static float lastFrame = 0.0f;
 static float frame = 60;
 static float minFgt = 1.0f / frame;
 
-static int petalAmount = 10000;
+static int petalAmount = 5000;
 static int prevPetalAmount = petalAmount;
 static std::vector<Petal> petalObjs;
 static std::vector<glm::mat4> petalPos;
