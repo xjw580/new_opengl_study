@@ -13,11 +13,13 @@ uniform bool useNormalMap;// 是否启用法线贴图
 uniform vec3 lightPos;
 uniform vec3 viewPos;
 uniform vec3 lightColor;
+uniform vec3 objColor;
 
 void main()
 {
     // 读取基础颜色（漫反射）
-    vec3 albedo = texture(texture_diffuse1, TexCoords).rgb;
+//    vec3 albedo = texture(texture_diffuse1, TexCoords).rgb;
+    vec3 albedo = objColor;
 
     // 计算法线
     vec3 normal = normalize(Normal);// 默认使用模型法线

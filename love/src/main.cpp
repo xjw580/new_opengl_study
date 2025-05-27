@@ -1,9 +1,7 @@
+#define GL_SILENCE_DEPRECATION
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-#include <stdio.h>
-#define GL_SILENCE_DEPRECATION
-#include <array>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -17,67 +15,18 @@
 
 #include <iostream>
 #include <random>
-#include <windows.h>
-#include <pdh.h>
-#include <pdhmsg.h>
+#include "main.h"
+
 #include <thread>
 
-namespace status {
-    const char *glsl_version = "#version 450";
-}
-
-// settings
-const unsigned int SCR_WIDTH = 2000;
-const unsigned int SCR_HEIGHT = 1500;
-
-// camera
-Camera camera(glm::vec3(0.0f, 10.0f, 20.0f));
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
-bool firstMouse = true;
-
-// timing
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
-
-// fram
-float frame = 60;
-float minFgt = 1.0f / frame;
-
-struct Obj {
-    glm::vec3 position;
-    float angle;
-    glm::vec3 scale;
-    glm::vec3 axis;
-};
-
-static constexpr int kPetalAmount = 2000;
-static std::vector<Obj> petalObj;
-static std::array<glm::mat4, kPetalAmount> petalPos;
-
-void FramebufferSizeCallback(GLFWwindow *window, int width, int height);
-
-void MouseCallback(GLFWwindow *window, double xpos, double ypos);
-
-void ScrollCallback(GLFWwindow *window, double xoffset, double yoffset);
-
-void ProcessInput(GLFWwindow *window);
-
-void InitPetalPositions();
-
-void RotatePetal(float time = glfwGetTime());
-
-float GetGPUUsage();
-
-
 static void GlfwErrorCallback(int error, const char *description) {
-    fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+    std::cerr << "GLFW Error " << error << ": " << description << std::endl;
 }
 
 static int ShowWindow() {
     glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
     // Create window with graphics context
-    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(kScrWidth, kScrHeight, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
     if (window == nullptr)
         return 1;
     glfwMakeContextCurrent(window);
@@ -102,7 +51,7 @@ static int ShowWindow() {
 
     Model petalModel{FileSystem::getPath(R"(resources/objects/petal/new_petal1.obj)")};
 
-    InitPetalPositions();
+    InitPetalObjs();
 
     unsigned int buffer;
     glGenBuffers(1, &buffer);
@@ -135,16 +84,17 @@ static int ShowWindow() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
-    (void) io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable; // Enable Docking
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // Enable Multi-Viewport / Platform Windows
+    // 不要自动合并窗口
     io.ConfigViewportsNoAutoMerge = true;
-    //io.ConfigViewportsNoTaskBarIcon = true;
+    io.ConfigViewportsNoTaskBarIcon = true;
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
+    // ImGui::StyleColorsClassic();
     //ImGui::StyleColorsLight();
 
     // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
@@ -155,24 +105,29 @@ static int ShowWindow() {
     }
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init(status::glsl_version);
+    ImGui_ImplOpenGL3_Init(glsl_version);
 
-    io.Fonts->AddFontFromFileTTF(R"(C:/Windows/Fonts/msyh.ttc)", 22.0f, nullptr,
-                                 io.Fonts->GetGlyphRangesJapanese());
+    io.Fonts->AddFontFromFileTTF(R"(C:/Windows/Fonts/simsun.ttc)", 22.0f, nullptr,
+                                 io.Fonts->GetGlyphRangesDefault());
+    io.Fonts->Build();
     IM_ASSERT(font != nullptr);
 
-    constexpr ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    camera.ProcessMouseMovement(0, -200);
+    constexpr ImVec4 bg_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    constexpr ImVec4 light_color = ImVec4(1.0f, 1.0f, 1.0f, 1.00f);
+    // constexpr ImVec4 petal_color = ImVec4(1.0f, 0.75f, 0.79f, 1.00f);
+    constexpr ImVec4 petal_color = ImVec4(1.0f, 0.05f, 0.1f, 1.00f);
 
-    float gpu_usage = 0.0f;
-    std::thread t([&gpu_usage, &window] {
+    std::thread t([&window] {
         while (!glfwWindowShouldClose(window)) {
-            gpu_usage = GetGPUUsage();
+            UpdatePetalAmount();
+            // RotatePetal();
+            MovePetal();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     });
     t.detach();
 
-    // 主要修改1：在渲染循环开始时清除深度缓冲
+    // camera.ProcessMouseMovement(0, -200);
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         const auto currentFrame = static_cast<float>(glfwGetTime());
@@ -190,19 +145,13 @@ static int ShowWindow() {
         ImGui::NewFrame();
         // ImGui界面代码...
         {
-            static float f = 0.0f;
-            static int counter = 0;
+            ImGui::SetNextWindowSize(ImVec2(600, 300));
+            ImGui::Begin("Console");
 
-            ImGui::Begin("Hello, world!");
-            ImGui::Text((std::string("GPU Usage: ") + std::to_string(gpu_usage)).data());
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-            ImGui::ColorEdit3("clear color", (float *) &clear_color);
-
-            if (ImGui::Button("Button"))
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-
+            ImGui::ColorEdit3("Background color", (float *) &bg_color);
+            ImGui::ColorEdit3("Light color", (float *) &light_color);
+            ImGui::ColorEdit3("Petal color", (float *) &petal_color);
+            ImGui::SliderInt("Petal amount", &petalAmount, 1, 10000);
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 
             ImGuiViewport *viewport = ImGui::GetWindowViewport();
@@ -210,13 +159,14 @@ static int ShowWindow() {
                 GLFWwindow *debug_imgui_window = static_cast<GLFWwindow *>(viewport->PlatformHandle);
                 glfwSetWindowAttrib(debug_imgui_window, GLFW_FLOATING, GLFW_TRUE);
             }
+
             ImGui::End();
         }
 
         // 设置清除颜色并清除颜色和深度缓冲区
-        glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w,
-                     clear_color.w);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // 关键修改：添加深度缓冲清除
+        glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w,
+                     bg_color.w);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // 3D渲染部分
         {
@@ -225,18 +175,20 @@ static int ShowWindow() {
             ourShader.use();
             ourShader.setVec3("lightPos", glm::vec3(2.0f, 2.0f, 2.0f));
             ourShader.setVec3("viewPos", camera.Position);
-            ourShader.setVec3("lightColor", glm::vec3(1.0f, 0.75f, 0.79f));
+            ourShader.setVec3("objColor", *(glm::vec3 *) &petal_color);
+            ourShader.setVec3("lightColor", *(glm::vec3 *) &light_color);
 
             // 视图/投影变换
             glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom),
-                                                    (float) SCR_WIDTH / (float) SCR_HEIGHT,
+                                                    (float) kScrWidth / (float) kScrHeight,
                                                     0.1f, 100.0f);
             glm::mat4 view = camera.GetViewMatrix();
             ourShader.setMat4("projection", projection);
             ourShader.setMat4("view", view);
 
-            RotatePetal();
-            glBufferData(GL_ARRAY_BUFFER, petalPos.size() * sizeof(glm::mat4), petalPos.data(), GL_DYNAMIC_DRAW);
+            glBindBuffer(GL_ARRAY_BUFFER, buffer);
+            glBufferData(GL_ARRAY_BUFFER, std::min(petalAmount, prevPetalAmount) * sizeof(glm::mat4), petalPos.data(),
+                         GL_DYNAMIC_DRAW);
 
             // 渲染花瓣模型
             ourShader.setInt("texture_diffuse1", 0);
@@ -275,48 +227,58 @@ static int ShowWindow() {
     return 0;
 }
 
-void InitPetalPositions() {
+static void InitPetalObjs() {
+    petalObjs.resize(petalAmount);
+    petalPos.resize(petalAmount);
+    // roseModel = new Model{FileSystem::getPath(R"(resources/objects/rose/rose1.obj)")};
+    roseModel = new Model{FileSystem::getPath(R"(resources/objects/rose/rose_advanced.obj)")};
+    // roseModel = new Model{FileSystem::getPath(R"(resources/objects/rose/heart1.obj)")};
+    auto vertices = roseModel->meshes[0].vertices;
     std::random_device rd;
     std::mt19937 gen(rd());
-    constexpr float radius_limit = 5.0f;
-    std::uniform_real_distribution<float> uniform(0.0f, 1.0f);
-    std::uniform_real_distribution<float> angle_distrib(0.0f, 360.0f);
+    std::uniform_real_distribution uniform(0.0f, static_cast<float>(vertices.size()));
+    float scaleFactor = 0.5f;
+    glm::mat4 scaleMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(scaleFactor, scaleFactor, scaleFactor));
+    for (int i = 0; auto &petalObj: petalObjs) {
+        petalPos[i] = InitPetal(petalObj);
 
-    petalObj.resize(kPetalAmount);
+        // 获取原始顶点位置
+        glm::vec4 originalVertexPos = glm::vec4(vertices[uniform(gen)].Position, 1.0f); // 确保是齐次坐标
 
-    for (int i = 0; auto &[position, angle, scale, axis]: petalObj) {
-        // 圆盘采样
-        float u = uniform(gen);
-        float v = uniform(gen);
-        float r = radius_limit * std::sqrt(u);
-        float theta = glm::two_pi<float>() * v;
+        // 应用缩放变换
+        glm::vec4 scaledVertexPos = scaleMatrix * originalVertexPos;
 
-        float x = r * std::cos(theta);
-        float z = r * std::sin(theta);
-        position = glm::vec3(x, -1.0f, z);
-
-        // 随机旋转
-        angle = glm::radians(angle_distrib(gen));
-        axis = glm::normalize(glm::vec3(uniform(gen), uniform(gen), uniform(gen)));
-
-        scale = glm::vec3(0.1f);
-
-        glm::mat4 model = glm::mat4{1.0f};
-        model = glm::translate(model, position);
-        model = glm::rotate(model, angle, axis);
-        model = glm::scale(model, scale);
-
-        petalPos[i] = model;
+        // 将缩放后的顶点位置设置为目标位置
+        petalObj.target_position = glm::vec3(scaledVertexPos); // 转换为vec3
         ++i;
     }
 }
 
-void RotatePetal(const float time) {
+static void UpdatePetalAmount() {
+    if (petalAmount - prevPetalAmount > 20) {
+        petalPos.reserve(petalAmount);
+        petalObjs.reserve(petalAmount);
+    }
+    while (true) {
+        if (prevPetalAmount < petalAmount) {
+            Petal petal;
+            petalPos.push_back(InitPetal(petal));
+            petalObjs.push_back(petal);
+            ++prevPetalAmount;
+        } else if (prevPetalAmount > petalAmount) {
+            --prevPetalAmount;
+            petalObjs.pop_back();
+            petalPos.pop_back();
+        } else break;
+    }
+}
+
+static void RotatePetal(const float time) {
     float baseAngle = glm::radians(0.1f); // 每帧基础旋转角速度
     float frequency = 1.0f; // 浮动频率
     float amplitude = 0.1f; // 浮动振幅
 
-    for (int i = 0; auto &[position, angle, scale, axis]: petalObj) {
+    for (int i = 0; auto &[src_position, position, angle, scale, axis, target_position]: petalObjs) {
         // 让每个花瓣有不同的旋转速率和起始角度，增加“生命感”
         float deltaAngle = baseAngle * (0.8f + 0.4f * std::sin(time + i));
         float radius = glm::length(glm::vec2(position.x, position.z));
@@ -347,51 +309,295 @@ void RotatePetal(const float time) {
     }
 }
 
-float GetGPUUsage() {
-    PDH_HQUERY hQuery;
-    PDH_HCOUNTER hCounter;
-    PDH_FMT_COUNTERVALUE counterVal;
+void MovePetal(const float time) {
+    static float windStrength = 1.0f;
+    static glm::vec2 windDirection = glm::normalize(glm::vec2(1.0f, 0.3f));
 
-    // 创建 PDH 查询
-    if (PdhOpenQuery(NULL, 0, &hQuery) != ERROR_SUCCESS) {
-        std::cerr << "Failed to open PDH query." << std::endl;
-        return 1;
-    }
+    // === 循环时间控制 ===
+    static float scatterTime = 3.0f; // 自由飞舞时间
+    static float assemblyTime = 5.0f; // 组装时间
+    static float finalAssemblyTime = 2.0f; // 最终定位时间
+    static float holdTime = 1.0f; // 保持玫瑰形状时间
+    static float disassemblyTime = 5.0f; // 解散时间
+    static float returnTime = 3.0f; // 返回原点时间
 
-    // 添加计数器：这个路径在任务管理器里可以查到（可用 perfmon 验证）
-    const char* counterPath = R"(\GPU Engine(*)\Utilization Percentage)";
+    float totalCycleTime = scatterTime + assemblyTime + finalAssemblyTime + holdTime + disassemblyTime + returnTime;
+    float cycleTime = fmod(time, totalCycleTime); // 当前循环内的时间
 
-    if (PdhAddEnglishCounter(hQuery, counterPath, 0, &hCounter) != ERROR_SUCCESS) {
-        std::cerr << "Failed to add PDH counter." << std::endl;
-        PdhCloseQuery(hQuery);
-        return 1;
-    }
+    // 计算当前阶段和进度
+    enum Phase { SCATTER, ASSEMBLY, FINAL_ASSEMBLY, HOLD, DISASSEMBLY, RETURN };
+    Phase currentPhase;
+    float phaseProgress = 0.0f;
 
-    // 初次收集数据
-    PdhCollectQueryData(hQuery);
-    Sleep(1000);  // 等一秒再采样
-
-    // 第二次收集数据后才能计算百分比
-    if (PdhCollectQueryData(hQuery) == ERROR_SUCCESS) {
-        if (PdhGetFormattedCounterValue(hCounter, PDH_FMT_DOUBLE, NULL, &counterVal) == ERROR_SUCCESS) {
-            // std::cout << "GPU Usage: " << counterVal.doubleValue << " %" << std::endl;
-            return counterVal.doubleValue;
-        } else {
-            std::cerr << "Failed to format counter value." << std::endl;
-        }
+    if (cycleTime < scatterTime) {
+        currentPhase = SCATTER;
+        phaseProgress = cycleTime / scatterTime;
+    } else if (cycleTime < scatterTime + assemblyTime) {
+        currentPhase = ASSEMBLY;
+        phaseProgress = (cycleTime - scatterTime) / assemblyTime;
+    } else if (cycleTime < scatterTime + assemblyTime + finalAssemblyTime) {
+        currentPhase = FINAL_ASSEMBLY;
+        phaseProgress = (cycleTime - scatterTime - assemblyTime) / finalAssemblyTime;
+    } else if (cycleTime < scatterTime + assemblyTime + finalAssemblyTime + holdTime) {
+        currentPhase = HOLD;
+        phaseProgress = (cycleTime - scatterTime - assemblyTime - finalAssemblyTime) / holdTime;
+    } else if (cycleTime < scatterTime + assemblyTime + finalAssemblyTime + holdTime + disassemblyTime) {
+        currentPhase = DISASSEMBLY;
+        phaseProgress = (cycleTime - scatterTime - assemblyTime - finalAssemblyTime - holdTime) / disassemblyTime;
     } else {
-        std::cerr << "Failed to collect query data." << std::endl;
+        currentPhase = RETURN;
+        phaseProgress = (cycleTime - scatterTime - assemblyTime - finalAssemblyTime - holdTime - disassemblyTime) /
+                        returnTime;
     }
 
-    PdhCloseQuery(hQuery);
+    // 平滑插值函数
+    auto smoothStep = [](float t) -> float {
+        return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f);
+    };
 
-    return 0;
+    // 动态风力效果
+    float windVariation = 0.7f + 0.3f * std::sin(time * 0.5f);
+    glm::vec2 currentWind = windDirection * windStrength * windVariation;
+
+    for (int i = 0; auto &[src_position, position, angle, scale, axis, target_position]: petalObjs) {
+        float petalTime = time + i * 0.3f;
+
+        // === 每个花瓣的个性化延迟 ===
+        float petalDelay = (i % 3) * 0.4f + std::sin(i * 0.5f) * 0.3f;
+
+        // 根据当前阶段计算个体进度
+        float individualProgress = 0.0f;
+        if (currentPhase == ASSEMBLY) {
+            individualProgress = glm::clamp((phaseProgress * assemblyTime - petalDelay) / assemblyTime, 0.0f, 1.0f);
+        } else if (currentPhase == FINAL_ASSEMBLY) {
+            individualProgress = 1.0f;
+        } else if (currentPhase == HOLD) {
+            individualProgress = 1.0f;
+        } else if (currentPhase == DISASSEMBLY) {
+            individualProgress = glm::clamp(1.0f - (phaseProgress * disassemblyTime - petalDelay) / disassemblyTime,
+                                            0.0f, 1.0f);
+        } else if (currentPhase == RETURN) {
+            individualProgress = 0.0f;
+        }
+
+        float individualSmooth = smoothStep(individualProgress);
+
+        // === 基础自然运动计算 ===
+        float currentRadius = glm::length(glm::vec2(position.x, position.z));
+        float theta = std::atan2(position.z, position.x);
+
+        // 根据阶段调整运动强度
+        float movementIntensity = 1.0f;
+        if (currentPhase == HOLD) {
+            movementIntensity = 0.1f; // 保持状态时几乎静止
+        } else if (currentPhase == ASSEMBLY || currentPhase == FINAL_ASSEMBLY) {
+            movementIntensity = 1.0f - individualSmooth * 0.8f;
+        } else if (currentPhase == DISASSEMBLY) {
+            movementIntensity = 0.2f + (1.0f - individualProgress) * 0.8f; // 逐渐恢复运动
+        }
+
+        // 旋转和扩散
+        float baseRotSpeed = (0.8f + 0.4f * std::sin(petalTime * 0.7f + i)) * movementIntensity;
+        float rotationSpeed = glm::radians(baseRotSpeed);
+
+        float spiralExpansion = 0.002f * (1.0f + 0.5f * std::sin(petalTime + i)) * movementIntensity;
+        currentRadius += spiralExpansion;
+        theta += rotationSpeed;
+
+        // 风力影响
+        float windDamping = (currentPhase == HOLD) ? 0.05f : (1.0f - individualSmooth * 0.9f);
+        glm::vec2 windOffset = currentWind * 0.02f * std::sin(petalTime + i) * windDamping;
+
+        // 基础自然位置
+        glm::vec3 naturalPos;
+        naturalPos.x = currentRadius * std::cos(theta) + windOffset.x;
+        naturalPos.z = currentRadius * std::sin(theta) + windOffset.y;
+
+        // === 垂直运动控制 ===
+        static std::vector<float> verticalVelocity(petalObjs.size(), 0.0f);
+        if (verticalVelocity.size() != petalObjs.size()) {
+            verticalVelocity.resize(petalObjs.size(), 0.0f);
+        }
+
+        if (currentPhase == SCATTER || (currentPhase == DISASSEMBLY && individualProgress < 0.2f) || currentPhase ==
+            RETURN) {
+            // 自由飞舞阶段的垂直运动
+            float liftForce = 0.015f * std::exp(-cycleTime * 0.1f) * (1.0f + 0.3f * std::sin(petalTime + i));
+            float gravity = -0.005f;
+            float airResistance = -verticalVelocity[i] * 0.15f;
+            float windLift = currentWind.x * 0.01f * std::sin(petalTime * 2.0f + i);
+
+            float verticalForce = liftForce + gravity + airResistance + windLift;
+            verticalVelocity[i] += verticalForce;
+        } else {
+            // 组装/保持阶段：垂直运动阻尼
+            float dampingFactor = (currentPhase == HOLD) ? 0.4f : 0.25f;
+            verticalVelocity[i] *= (1.0f - dampingFactor);
+        }
+
+        naturalPos.y = position.y + verticalVelocity[i];
+
+        // 地面碰撞
+        if (naturalPos.y < -2.0f && (currentPhase == SCATTER || currentPhase == RETURN)) {
+            naturalPos.y = -2.0f;
+            verticalVelocity[i] *= -0.3f;
+        }
+
+        // === 根据阶段计算目标位置 ===
+        glm::vec3 targetPos;
+
+        if (currentPhase == SCATTER) {
+            // 自由飞舞阶段 - 保持自然运动
+            position = naturalPos;
+        } else if (currentPhase == ASSEMBLY || currentPhase == FINAL_ASSEMBLY) {
+            // 组装阶段 - 向target_position移动
+            glm::vec3 toTarget = target_position - naturalPos;
+            float distanceToTarget = glm::length(toTarget);
+
+            // 螺旋接近路径
+            glm::vec3 approachPath = glm::vec3(0.0f);
+            if (individualProgress > 0.0f && individualProgress < 0.9f) {
+                float spiralRadius = distanceToTarget * (1.0f - individualProgress) * 0.8f;
+                float spiralAngle = petalTime * 4.5f + i * 1.2f;
+
+                approachPath.x = spiralRadius * std::cos(spiralAngle);
+                approachPath.z = spiralRadius * std::sin(spiralAngle);
+                approachPath.y = std::sin(petalTime * 0.3f + i) * 0.05f * (1.0f - individualProgress);
+            }
+
+            glm::vec3 spiralTarget = target_position + approachPath;
+
+            if (currentPhase == FINAL_ASSEMBLY) {
+                float finalWeight = smoothStep(phaseProgress);
+                position = glm::mix(spiralTarget, target_position, finalWeight);
+            } else {
+                position = glm::mix(naturalPos, spiralTarget, individualSmooth);
+            }
+        } else if (currentPhase == HOLD) {
+            // 保持阶段 - 在target_position附近轻微摆动
+            glm::vec3 gentleMovement = glm::vec3(
+                std::sin(petalTime * 0.2f + i) * 0.02f,
+                std::cos(petalTime * 0.15f + i) * 0.01f,
+                std::sin(petalTime * 0.25f + i * 1.1f) * 0.02f
+            );
+            position = target_position + gentleMovement;
+        } else if (currentPhase == DISASSEMBLY) {
+            // 解散阶段 - 从target_position回到自然运动
+            glm::vec3 scatterPath = glm::vec3(0.0f);
+
+            // 添加解散时的爆炸性运动
+            if (phaseProgress < 0.3f) {
+                float burstIntensity = (0.3f - phaseProgress) / 0.3f;
+                glm::vec3 burstDirection = glm::normalize(target_position - glm::vec3(0.0f));
+                scatterPath = burstDirection * burstIntensity * 0.5f * std::sin(petalTime * 3.0f + i);
+            }
+
+            // 逐渐增加螺旋离散效果
+            if (phaseProgress > 0.1f) {
+                float spiralOut = (phaseProgress - 0.1f) / 0.9f;
+                float outwardRadius = spiralOut * 2.0f;
+                float outwardAngle = petalTime * 3.0f + i * 1.5f;
+
+                scatterPath.x += outwardRadius * std::cos(outwardAngle);
+                scatterPath.z += outwardRadius * std::sin(outwardAngle);
+                scatterPath.y += std::sin(petalTime * 0.5f + i) * 0.3f * spiralOut;
+            }
+
+            glm::vec3 scatterPos = naturalPos + scatterPath;
+            position = glm::mix(target_position, scatterPos, smoothStep(phaseProgress));
+        } else if (currentPhase == RETURN) {
+            // 返回阶段 - 回到src_position
+            glm::vec3 toSrc = src_position - naturalPos;
+            float distanceToSrc = glm::length(toSrc);
+
+            // 类似组装的螺旋回归
+            glm::vec3 returnPath = glm::vec3(0.0f);
+            if (phaseProgress > 0.0f && phaseProgress < 0.9f) {
+                float returnRadius = distanceToSrc * (1.0f - phaseProgress) * 0.6f;
+                float returnAngle = petalTime * -3.0f + i * 0.8f; // 反向旋转
+
+                returnPath.x = returnRadius * std::cos(returnAngle);
+                returnPath.z = returnRadius * std::sin(returnAngle);
+                returnPath.y = std::sin(petalTime * 0.4f + i) * 0.1f * (1.0f - phaseProgress);
+            }
+
+            glm::vec3 returnTarget = src_position + returnPath;
+            position = glm::mix(naturalPos, returnTarget, smoothStep(phaseProgress));
+        }
+
+        // === 旋转和翻滚控制 ===
+        float tumblingIntensity = movementIntensity;
+        if (currentPhase == HOLD) {
+            tumblingIntensity = 0.05f; // 保持时几乎不翻滚
+        }
+
+        float tumblingX = std::sin(petalTime * 1.2f + i) * 0.3f * tumblingIntensity;
+        float tumblingY = std::cos(petalTime * 0.8f + i * 1.5f) * 0.2f * tumblingIntensity;
+        float tumblingZ = std::sin(petalTime * 1.5f + i * 0.7f) * 0.4f * tumblingIntensity;
+
+        // 主轴旋转
+        float rotationDamping = (currentPhase == HOLD) ? 0.05f : glm::max(0.1f, movementIntensity);
+        angle += glm::radians(2.0f) * (1.0f + 0.5f * std::sin(petalTime + i)) * rotationDamping;
+
+        // === 构建变换矩阵 ===
+        glm::mat4 model{1.0f};
+        model = glm::translate(model, position);
+        model = glm::rotate(model, angle, axis);
+        model = glm::rotate(model, tumblingX, glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::rotate(model, tumblingY, glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::rotate(model, tumblingZ, glm::vec3(0.0f, 0.0f, 1.0f));
+
+        // 尺寸控制
+        float scaleVariation = 1.0f + 0.1f * std::sin(petalTime * 0.6f + i) * tumblingIntensity;
+
+        // 组装时的分层效果
+        if (currentPhase == ASSEMBLY || currentPhase == FINAL_ASSEMBLY || currentPhase == HOLD) {
+            float layerScale = 1.0f - (i % 7) * 0.05f;
+            float layerWeight = (currentPhase == HOLD) ? 1.0f : individualSmooth;
+            scaleVariation = glm::mix(scaleVariation, layerScale, layerWeight);
+        }
+
+        glm::vec3 dynamicScale = scale * scaleVariation;
+        model = glm::scale(model, dynamicScale);
+
+        petalPos[i] = model;
+        ++i;
+    }
 }
 
+static glm::mat4 InitPetal(Petal &petal) {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    constexpr float radius_limit = 10.0f;
+    std::uniform_real_distribution<float> uniform(0.0f, 1.0f);
+    std::uniform_real_distribution<float> angle_distrib(0.0f, 360.0f);
 
-// process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
-// ---------------------------------------------------------------------------------------------------------
-void ProcessInput(GLFWwindow *window) {
+    auto &[src_position, position,angle,scale,axis, target_position] = petal;
+    // 圆盘采样
+    float u = uniform(gen);
+    float v = uniform(gen);
+    float r = radius_limit * std::sqrt(u);
+    float theta = glm::two_pi<float>() * v;
+
+    float x = r * std::cos(theta);
+    float z = r * std::sin(theta);
+    src_position = glm::vec3(x, -2.0f, z);
+    position = src_position;
+
+    // 随机旋转
+    angle = glm::radians(angle_distrib(gen));
+    axis = glm::normalize(glm::vec3(uniform(gen), uniform(gen), uniform(gen)));
+
+    scale = glm::vec3(0.1f);
+
+    glm::mat4 model = glm::mat4{1.0f};
+    model = glm::translate(model, position);
+    model = glm::rotate(model, angle, axis);
+    model = glm::scale(model, scale);
+    return model;
+}
+
+static void ProcessInput(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
@@ -404,41 +610,33 @@ void ProcessInput(GLFWwindow *window) {
         camera.ProcessKeyboard(RIGHT, deltaTime);
 }
 
-void ScrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
+static void ScrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 
-// glfw: whenever the window size changed (by OS or user resize) this callback function executes
-// ---------------------------------------------------------------------------------------------
-void FramebufferSizeCallback(GLFWwindow *window, int width, int height) {
-    // make sure the viewport matches the new window dimensions; note that width and
-    // height will be significantly larger than specified on retina displays.
+static void FramebufferSizeCallback(GLFWwindow *window, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-// glfw: whenever the mouse moves, this callback is called
-// -------------------------------------------------------
-void MouseCallback(GLFWwindow *window, double xposIn, double yposIn) {
-    float xpos = static_cast<float>(xposIn);
-    float ypos = static_cast<float>(yposIn);
+static void MouseCallback(GLFWwindow *window, double xposIn, double yposIn) {
+    auto x_pos = static_cast<float>(xposIn);
+    auto y_pos = static_cast<float>(yposIn);
 
     if (firstMouse) {
-        lastX = xpos;
-        lastY = ypos;
+        lastX = x_pos;
+        lastY = y_pos;
         firstMouse = false;
     }
 
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+    float x_offset = x_pos - lastX;
+    float y_offset = lastY - y_pos; // reversed since y-coordinates go from bottom to top
 
-    lastX = xpos;
-    lastY = ypos;
+    lastX = x_pos;
+    lastY = y_pos;
 
-    camera.ProcessMouseMovement(xoffset, yoffset);
+    camera.ProcessMouseMovement(x_offset, y_offset);
 }
 
-
-// Main code
 int main(int, char **) {
     glfwSetErrorCallback(GlfwErrorCallback);
     if (!glfwInit())

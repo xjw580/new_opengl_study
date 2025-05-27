@@ -21,13 +21,13 @@ void ScrollCallback(GLFWwindow *window, double xoffset, double yoffset);
 void ProcessInput(GLFWwindow *window);
 
 // settings
-const unsigned int SCR_WIDTH = 2000;
-const unsigned int SCR_HEIGHT = 1500;
+const unsigned int kScrWidth = 2000;
+const unsigned int kScrHeight = 1500;
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
+float lastX = kScrWidth / 2.0f;
+float lastY = kScrHeight / 2.0f;
 bool firstMouse = true;
 
 // timing
@@ -63,7 +63,7 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(kScrWidth, kScrHeight, "LearnOpenGL", nullptr, nullptr);
     if (window == nullptr) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -186,7 +186,7 @@ int main() {
         boxShader.setVec3("viewPos", camera.Position); // 相机位置
         boxShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f)); // 光源颜色（白色）
 
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) kScrWidth / (float) kScrHeight, 0.1f,
                                                 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
         boxShader.setMat4("projection", projection);
