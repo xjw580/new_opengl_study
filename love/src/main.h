@@ -5,12 +5,12 @@
 #define MAIN_H
 
 struct Petal {
+    glm::vec3 curr_position;
     glm::vec3 src_position;
-    glm::vec3 position;
+    glm::vec3 target_position;
     float angle;
     glm::vec3 scale;
     glm::vec3 axis;
-    glm::vec3 target_position;
 };
 
 void FramebufferSizeCallback(GLFWwindow *window, int width, int height);

@@ -15,9 +15,8 @@
 
 #include <iostream>
 #include <random>
-#include "main.h"
-
 #include <thread>
+#include "main.h"
 
 static void GlfwErrorCallback(int error, const char *description) {
     std::cerr << "GLFW Error " << error << ": " << description << std::endl;
@@ -278,21 +277,21 @@ static void RotatePetal(const float time) {
     float frequency = 1.0f; // 浮动频率
     float amplitude = 0.1f; // 浮动振幅
 
-    for (int i = 0; auto &[src_position, position, angle, scale, axis, target_position]: petalObjs) {
+    for (int i = 0; auto &[curr_position, src_position, target_position, angle, scale, axis]: petalObjs) {
         // 让每个花瓣有不同的旋转速率和起始角度，增加“生命感”
         float deltaAngle = baseAngle * (0.8f + 0.4f * std::sin(time + i));
-        float radius = glm::length(glm::vec2(position.x, position.z));
-        float theta = std::atan2(position.z, position.x);
+        float radius = glm::length(glm::vec2(curr_position.x, curr_position.z));
+        float theta = std::atan2(curr_position.z, curr_position.x);
 
         // 角度偏移旋转
         theta += deltaAngle;
 
         // 更新位置（仍保持圆心旋转，但带有一点非均匀性）
-        position.x = radius * std::cos(theta);
-        position.z = radius * std::sin(theta);
+        curr_position.x = radius * std::cos(theta);
+        curr_position.z = radius * std::sin(theta);
 
         // 上下浮动，模拟风感
-        position.y = -1.0f + std::sin(time * frequency + i) * amplitude;
+        curr_position.y = -1.0f + std::sin(time * frequency + i) * amplitude;
 
         // 可选：让花瓣自身也慢慢旋转（增加变化感）
         float selfSpin = glm::radians(1.0f) * std::sin(time + i);
@@ -301,7 +300,7 @@ static void RotatePetal(const float time) {
 
         // 重建模型矩阵
         glm::mat4 model{1.0f};
-        model = glm::translate(model, position);
+        model = glm::translate(model, curr_position);
         model = glm::rotate(model, totalAngle, axis);
         model = glm::scale(model, scale);
         petalPos[i] = model;
@@ -332,16 +331,16 @@ void MovePetal(const float time) {
     if (cycleTime < scatterTime) {
         currentPhase = SCATTER;
         phaseProgress = cycleTime / scatterTime;
-    } else if (cycleTime < scatterTime + assemblyTime) {
+    } else if (int tempTime = 0; cycleTime < (tempTime = scatterTime + assemblyTime)) {
         currentPhase = ASSEMBLY;
         phaseProgress = (cycleTime - scatterTime) / assemblyTime;
-    } else if (cycleTime < scatterTime + assemblyTime + finalAssemblyTime) {
+    } else if (cycleTime < (tempTime = tempTime + finalAssemblyTime)) {
         currentPhase = FINAL_ASSEMBLY;
         phaseProgress = (cycleTime - scatterTime - assemblyTime) / finalAssemblyTime;
-    } else if (cycleTime < scatterTime + assemblyTime + finalAssemblyTime + holdTime) {
+    } else if (cycleTime < (tempTime = tempTime + holdTime)) {
         currentPhase = HOLD;
         phaseProgress = (cycleTime - scatterTime - assemblyTime - finalAssemblyTime) / holdTime;
-    } else if (cycleTime < scatterTime + assemblyTime + finalAssemblyTime + holdTime + disassemblyTime) {
+    } else if (cycleTime < tempTime + disassemblyTime) {
         currentPhase = DISASSEMBLY;
         phaseProgress = (cycleTime - scatterTime - assemblyTime - finalAssemblyTime - holdTime) / disassemblyTime;
     } else {
@@ -350,8 +349,8 @@ void MovePetal(const float time) {
                         returnTime;
     }
 
-    // 平滑插值函数
-    auto smoothStep = [](float t) -> float {
+    // Perlin插值
+    auto smoothStep = [](const float t) -> float {
         return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f);
     };
 
@@ -359,7 +358,7 @@ void MovePetal(const float time) {
     float windVariation = 0.7f + 0.3f * std::sin(time * 0.5f);
     glm::vec2 currentWind = windDirection * windStrength * windVariation;
 
-    for (int i = 0; auto &[src_position, position, angle, scale, axis, target_position]: petalObjs) {
+    for (int i = 0; auto &[curr_position, src_position, target_position, angle, scale, axis]: petalObjs) {
         float petalTime = time + i * 0.3f;
 
         // === 每个花瓣的个性化延迟 ===
@@ -383,8 +382,8 @@ void MovePetal(const float time) {
         float individualSmooth = smoothStep(individualProgress);
 
         // === 基础自然运动计算 ===
-        float currentRadius = glm::length(glm::vec2(position.x, position.z));
-        float theta = std::atan2(position.z, position.x);
+        float currentRadius = glm::length(glm::vec2(curr_position.x, curr_position.z));
+        float theta = std::atan2(curr_position.z, curr_position.x);
 
         // 根据阶段调整运动强度
         float movementIntensity = 1.0f;
@@ -435,7 +434,7 @@ void MovePetal(const float time) {
             verticalVelocity[i] *= (1.0f - dampingFactor);
         }
 
-        naturalPos.y = position.y + verticalVelocity[i];
+        naturalPos.y = curr_position.y + verticalVelocity[i];
 
         // 地面碰撞
         if (naturalPos.y < -2.0f && (currentPhase == SCATTER || currentPhase == RETURN)) {
@@ -448,7 +447,7 @@ void MovePetal(const float time) {
 
         if (currentPhase == SCATTER) {
             // 自由飞舞阶段 - 保持自然运动
-            position = naturalPos;
+            curr_position = naturalPos;
         } else if (currentPhase == ASSEMBLY || currentPhase == FINAL_ASSEMBLY) {
             // 组装阶段 - 向target_position移动
             glm::vec3 toTarget = target_position - naturalPos;
@@ -469,9 +468,9 @@ void MovePetal(const float time) {
 
             if (currentPhase == FINAL_ASSEMBLY) {
                 float finalWeight = smoothStep(phaseProgress);
-                position = glm::mix(spiralTarget, target_position, finalWeight);
+                curr_position = glm::mix(spiralTarget, target_position, finalWeight);
             } else {
-                position = glm::mix(naturalPos, spiralTarget, individualSmooth);
+                curr_position = glm::mix(naturalPos, spiralTarget, individualSmooth);
             }
         } else if (currentPhase == HOLD) {
             // 保持阶段 - 在target_position附近轻微摆动
@@ -480,7 +479,7 @@ void MovePetal(const float time) {
                 std::cos(petalTime * 0.15f + i) * 0.01f,
                 std::sin(petalTime * 0.25f + i * 1.1f) * 0.02f
             );
-            position = target_position + gentleMovement;
+            curr_position = target_position + gentleMovement;
         } else if (currentPhase == DISASSEMBLY) {
             // 解散阶段 - 从target_position回到自然运动
             glm::vec3 scatterPath = glm::vec3(0.0f);
@@ -504,7 +503,7 @@ void MovePetal(const float time) {
             }
 
             glm::vec3 scatterPos = naturalPos + scatterPath;
-            position = glm::mix(target_position, scatterPos, smoothStep(phaseProgress));
+            curr_position = glm::mix(target_position, scatterPos, smoothStep(phaseProgress));
         } else if (currentPhase == RETURN) {
             // 返回阶段 - 回到src_position
             glm::vec3 toSrc = src_position - naturalPos;
@@ -522,7 +521,7 @@ void MovePetal(const float time) {
             }
 
             glm::vec3 returnTarget = src_position + returnPath;
-            position = glm::mix(naturalPos, returnTarget, smoothStep(phaseProgress));
+            curr_position = glm::mix(naturalPos, returnTarget, smoothStep(phaseProgress));
         }
 
         // === 旋转和翻滚控制 ===
@@ -541,7 +540,7 @@ void MovePetal(const float time) {
 
         // === 构建变换矩阵 ===
         glm::mat4 model{1.0f};
-        model = glm::translate(model, position);
+        model = glm::translate(model, curr_position);
         model = glm::rotate(model, angle, axis);
         model = glm::rotate(model, tumblingX, glm::vec3(1.0f, 0.0f, 0.0f));
         model = glm::rotate(model, tumblingY, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -557,8 +556,9 @@ void MovePetal(const float time) {
             scaleVariation = glm::mix(scaleVariation, layerScale, layerWeight);
         }
 
-        glm::vec3 dynamicScale = scale * scaleVariation;
-        model = glm::scale(model, dynamicScale);
+        // glm::vec3 dynamicScale = scale * scaleVariation;
+        // model = glm::scale(model, dynamicScale);
+        model = glm::scale(model, scale);
 
         petalPos[i] = model;
         ++i;
@@ -572,7 +572,7 @@ static glm::mat4 InitPetal(Petal &petal) {
     std::uniform_real_distribution<float> uniform(0.0f, 1.0f);
     std::uniform_real_distribution<float> angle_distrib(0.0f, 360.0f);
 
-    auto &[src_position, position,angle,scale,axis, target_position] = petal;
+    auto &[curr_position, src_position,target_position,angle,scale, axis] = petal;
     // 圆盘采样
     float u = uniform(gen);
     float v = uniform(gen);
@@ -582,7 +582,7 @@ static glm::mat4 InitPetal(Petal &petal) {
     float x = r * std::cos(theta);
     float z = r * std::sin(theta);
     src_position = glm::vec3(x, -2.0f, z);
-    position = src_position;
+    curr_position = src_position;
 
     // 随机旋转
     angle = glm::radians(angle_distrib(gen));
@@ -591,7 +591,7 @@ static glm::mat4 InitPetal(Petal &petal) {
     scale = glm::vec3(0.1f);
 
     glm::mat4 model = glm::mat4{1.0f};
-    model = glm::translate(model, position);
+    model = glm::translate(model, curr_position);
     model = glm::rotate(model, angle, axis);
     model = glm::scale(model, scale);
     return model;
