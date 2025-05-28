@@ -18,8 +18,8 @@ uniform vec3 objColor;
 void main()
 {
     // 读取基础颜色（漫反射）
-//    vec3 albedo = texture(texture_diffuse1, TexCoords).rgb;
-    vec3 albedo = objColor;
+    //    vec3 albedo = texture(texture_diffuse1, TexCoords).rgb;
+    vec3 albedo = objColor * vec3(0.8f, 0.3f, 0.5f);
 
     // 计算法线
     vec3 normal = normalize(Normal);// 默认使用模型法线
@@ -34,13 +34,14 @@ void main()
 
     vec3 viewDir = normalize(viewPos - FragPos);
     vec3 halfwayDir = normalize(lightDir + viewDir);
-    float spec = pow(max(dot(normal, halfwayDir), 0.0), 32.0);// 高光
+    float spec = pow(max(dot(normal, halfwayDir), 0.0), 8.0);// 高光
 
-    vec3 diffuse = diff * lightColor * albedo;
-    vec3 specular = spec * lightColor;
+    vec3 diffuse = diff * lightColor * albedo * vec3(0.9, 0.4, 0.6);
+    vec3 specular = spec * lightColor* vec3(0.2, 0.2, 0.2);
 
-        FragColor = vec4(diffuse + specular, 1.0);
-//        FragColor = vec4(albedo, 1.0);
+    FragColor = vec4(diffuse + specular, 1);
+    //    FragColor = vec4(albedo, 0.5);
+    //        FragColor = vec4(albedo, 1.0);
     // 颜色基于坐标
-//    FragColor = vec4(vec3(gl_FragCoord.z), 1.0);
+    //    FragColor = vec4(vec3(gl_FragCoord.z), 1.0);
 }

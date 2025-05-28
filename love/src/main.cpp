@@ -163,7 +163,7 @@ static int ShowWindow() {
             ProcessInput(window);
 
             ourShader->use();
-            ourShader->setVec3("lightPos", glm::vec3(2.0f, 2.0f, 2.0f));
+            ourShader->setVec3("lightPos", glm::vec3(0.0f, 0.0f, 50.0f));
             ourShader->setVec3("viewPos", camera.Position);
             ourShader->setVec3("objColor", *(glm::vec3 *) &petal_color);
             ourShader->setVec3("lightColor", *(glm::vec3 *) &light_color);
