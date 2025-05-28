@@ -31,16 +31,20 @@ void MovePetal(float time = glfwGetTime());
 
 glm::mat4 InitPetal(Petal &petal);
 
+void UpdateStatus(GLFWwindow *window);
+
 static const char *glsl_version = "#version 450";
 
 // settings
-static constexpr unsigned int kScrWidth = 2000;
-static constexpr unsigned int kScrHeight = 1500;
+static unsigned int kScrWidth = 1500;
+static unsigned int kScrHeight = 1000;
+
+static float windowAspect = static_cast<float>(kScrWidth) / static_cast<float>(kScrHeight);
 
 // camera
-static Camera camera(glm::vec3(0.0f, 10.0f, 40.0f));
-static float lastX = kScrWidth / 2.0f;
-static float lastY = kScrHeight / 2.0f;
+static Camera camera(glm::vec3(0.0f, 10.0f, 45.0f));
+static float lastX = static_cast<float>(kScrWidth) / 2.0f;
+static float lastY = static_cast<float>(kScrHeight) / 2.0f;
 static bool firstMouse = true;
 
 // timing
@@ -51,10 +55,15 @@ static float lastFrame = 0.0f;
 static float frame = 60;
 static float minFgt = 1.0f / frame;
 
-static int petalAmount = 5000;
+static int petalAmount = 6000;
 static int prevPetalAmount = petalAmount;
 static std::vector<Petal> petalObjs;
 static std::vector<glm::mat4> petalPos;
+static char phase[255];
+static unsigned int petalBuffer;
 static Model *roseModel;
+static Shader *ourShader;
+static Model *petalModel;
+static GLFWwindow *window;
 
 #endif
