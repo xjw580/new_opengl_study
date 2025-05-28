@@ -71,10 +71,11 @@ static int ShowWindow() {
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
-    io.Fonts->AddFontFromFileTTF(R"(C:/Windows/Fonts/simsun.ttc)", 22.0f, nullptr,
-                                 io.Fonts->GetGlyphRangesDefault());
-    io.Fonts->Build();
+    const auto font = io.Fonts->AddFontFromFileTTF(R"(C:/Windows/Fonts/simsun.ttc)", 22.0f, nullptr,
+                                             io.Fonts->GetGlyphRangesDefault());
     IM_ASSERT(font != nullptr);
+    io.Fonts->Build();
+
 
     constexpr ImVec4 bg_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     constexpr ImVec4 light_color = ImVec4(1.0f, 1.0f, 1.0f, 1.00f);
