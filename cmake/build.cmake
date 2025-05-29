@@ -1,4 +1,4 @@
-macro (my_add_assimp_dll)
+macro (my_copy_assimp_dll)
 
     # 设置输出目录
     set(EXECUTABLE_OUTPUT_DIR ${CMAKE_BINARY_DIR}/${PROJECT_NAME})
@@ -25,5 +25,6 @@ macro (my_add_target name type)
         add_executable(${name} ${srcs})
     else()
         add_library(${name} ${type} ${srcs})
+        target_include_directories(${name} PUBLIC include)
     endif()
 endmacro()

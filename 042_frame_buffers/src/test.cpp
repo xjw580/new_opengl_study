@@ -11,9 +11,9 @@
 #include <filesystem.h>
 
 #include <iostream>
-#include "meshs/BoxMesh.h"
+#include "../../libs/include/meshs/BoxMesh.h"
 #include "meshs/WindowMesh.h"
-#include "meshs/GrassMesh.h"
+#include "../../libs/include/meshs/GrassMesh.h"
 #include "meshs/FloorMesh.h"
 
 
@@ -145,7 +145,7 @@ int main() {
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo); // now actually attach it
     // now that we actually created the framebuffer and added all attachments we want to check if it is actually complete now
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
+        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 

@@ -1,2 +1,3 @@
 const char * project_root = "${CMAKE_SOURCE_DIR}";
+// const char * project_root = "${CMAKE_CURRENT_SOURCE_DIR}";
 const char * out_root = "${CMAKE_BINARY_DIR}/${PROJECT_NAME}";

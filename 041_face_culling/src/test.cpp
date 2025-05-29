@@ -11,9 +11,9 @@
 #include <filesystem.h>
 
 #include <iostream>
-#include "meshs/BoxMesh.h"
+#include "../../libs/include/meshs/BoxMesh.h"
 #include "meshs/WindowMesh.h"
-#include "meshs/GrassMesh.h"
+#include "../../libs/include/meshs/GrassMesh.h"
 
 
 void FramebufferSizeCallback(GLFWwindow *window, int width, int height);
