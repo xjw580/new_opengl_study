@@ -1,4 +1,4 @@
-project(043_love_demo)
+project(044_cube_map)
 
 my_add_target(${PROJECT_NAME} EXECUTABLE)
 

@@ -46,7 +46,8 @@ public:
     unsigned int VAO{};
 
     // constructor
-    Mesh(const std::vector<GLfloat> &vertices, std::vector<unsigned int> &indices, const std::vector<Texture> &textures) {
+    Mesh(const std::vector<GLfloat> &vertices, const std::vector<unsigned int> &indices,
+         const std::vector<Texture> &textures) {
         for (unsigned int i = 0; i < vertices.size();) {
             this->vertices.push_back(Vertex{
                 glm::vec3{vertices[i++], vertices[i++], vertices[i++]},
@@ -62,7 +63,8 @@ public:
     }
 
     // constructor
-    Mesh(const std::vector<Vertex> &vertices, const std::vector<unsigned int> &indices, const std::vector<Texture> &textures) {
+    Mesh(const std::vector<Vertex> &vertices, const std::vector<unsigned int> &indices,
+         const std::vector<Texture> &textures) {
         this->vertices = vertices;
         this->indices = indices;
         this->textures = textures;
@@ -78,24 +80,40 @@ public:
         unsigned int specularNr = 1;
         unsigned int normalNr = 1;
         unsigned int heightNr = 1;
+        unsigned int cubemapNr = 1;
         for (unsigned int i = 0; i < textures.size(); i++) {
             glActiveTexture(GL_TEXTURE0 + i); // active proper texture unit before binding
             // retrieve texture number (the N in diffuse_textureN)
             std::string number;
             std::string name = textures[i].type;
-            if (name == "texture_diffuse")
-                number = std::to_string(diffuseNr++);
-            else if (name == "texture_specular")
-                number = std::to_string(specularNr++); // transfer unsigned int to string
-            else if (name == "texture_normal")
-                number = std::to_string(normalNr++); // transfer unsigned int to string
-            else if (name == "texture_height")
-                number = std::to_string(heightNr++); // transfer unsigned int to string
+            bool is_cubemap = false;
+            if (name == "texture_diffuse") {
+                number = std::to_string(diffuseNr);
+                diffuseNr++;
+            } else if (name == "texture_specular") {
+                number = std::to_string(specularNr);
+                specularNr++;
+            } else if (name == "texture_normal") {
+                number = std::to_string(normalNr);
+                normalNr++;
+            } else if (name == "texture_height") {
+                number = std::to_string(heightNr);
+                heightNr++;
+            } else if (name == "texture_cubemap") {
+                number = std::to_string(cubemapNr);
+                cubemapNr++;
+                is_cubemap = true;
+            }
 
             // now set the sampler to the correct texture unit
             glUniform1i(glGetUniformLocation(shader.ID, (name + number).c_str()), i);
+
             // and finally bind the texture
-            glBindTexture(GL_TEXTURE_2D, textures[i].id);
+            if (is_cubemap) {
+                glBindTexture(GL_TEXTURE_2D, textures[i].id);
+            } else {
+                glBindTexture(GL_TEXTURE_CUBE_MAP, textures[i].id);
+            }
         }
 
         // draw mesh
@@ -155,4 +173,47 @@ private:
         glBindVertexArray(0);
     }
 };
+
+class SkyMesh : public Mesh {
+public:
+    SkyMesh(
+        const std::vector<Vertex> &vertices,
+        const std::vector<unsigned int> &indices,
+        const std::vector<std::string> &texture_face_paths): Mesh(vertices, indices, loadCubemap(texture_face_paths)) {
+    }
+
+    SkyMesh(
+        const std::vector<GLfloat> &vertices,
+        const std::vector<unsigned int> &indices,
+        const std::vector<std::string> &texture_face_paths): Mesh(vertices, indices, loadCubemap(texture_face_paths)) {
+    }
+
+private:
+    std::vector<Texture> loadCubemap(const std::vector<std::string> &faces) {
+        unsigned int textureID;
+        glGenTextures(1, &textureID);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+        int width, height, nrChannels;
+        for (unsigned int i = 0; i < faces.size(); i++) {
+            unsigned char *data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
+            if (data) {
+                glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                             0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data
+                );
+                stbi_image_free(data);
+            } else {
+                std::cout << "Cubemap texture failed to load at path: " << faces[i] << std::endl;
+                stbi_image_free(data);
+            }
+        }
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        return std::vector{Texture{textureID, "texture_cubemap", aiString()}};
+    }
+};
+
 #endif

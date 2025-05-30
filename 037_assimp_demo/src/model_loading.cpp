@@ -91,16 +91,16 @@ int main() {
 
     // load models
     // -----------
-    Model ourModel(FileSystem::getPath(R"(resources/objects/backpack/backpack.obj)"));
-    // Model ourModel{FileSystem::getPath(R"(resources/objects/brain/Brain_Model.obj)")};
-    // Model ourModel{FileSystem::getPath(R"(resources/objects/rose/rose_wet_2k_2k_v01.obj)")};
-    // Model ourModel{FileSystem::getPath(R"(resources/objects/rose/rose1.obj)")};
-    // Model ourModel{FileSystem::getPath(R"(resources/objects/rose/rose_wet_200k_4k_v01.obj)")};
-    // Model ourModel(FileSystem::getPath(R"(resources/objects/brain_areas/scene.gltf)"));
+    Model ourModel(FileSystem::getPath(R"(resources/model/backpack/backpack.obj)"));
+    // Model ourModel{FileSystem::getPath(R"(resources/model/brain/Brain_Model.obj)")};
+    // Model ourModel{FileSystem::getPath(R"(resources/model/rose/rose_wet_2k_2k_v01.obj)")};
+    // Model ourModel{FileSystem::getPath(R"(resources/model/rose/rose1.obj)")};
+    // Model ourModel{FileSystem::getPath(R"(resources/model/rose/rose_wet_200k_4k_v01.obj)")};
+    // Model ourModel(FileSystem::getPath(R"(resources/model/brain_areas/scene.gltf)"));
 
-    // Model ourModel(FileSystem::getPath(R"(resources/objects/brain_project/scene.gltf)"));
-    // Model ourModel(FileSystem::getPath(R"(resources/objects/Human_Head.fbx)"));
-    // Model ourModel(FileSystem::getPath(R"(resources/objects/Woman_Head.obj)"));
+    // Model ourModel(FileSystem::getPath(R"(resources/model/brain_project/scene.gltf)"));
+    // Model ourModel(FileSystem::getPath(R"(resources/model/Human_Head.fbx)"));
+    // Model ourModel(FileSystem::getPath(R"(resources/model/Woman_Head.obj)"));
 
 
     // draw in wireframe

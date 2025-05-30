@@ -18,6 +18,8 @@
 #include <thread>
 #include "main.h"
 
+#include "meshs/LandscapeSkyMesh.h"
+
 static void GlfwErrorCallback(int error, const char *description) {
     std::cerr << "GLFW Error " << error << ": " << description << std::endl;
 }
@@ -83,8 +85,12 @@ static int ShowWindow() {
     constexpr ImVec4 petal_color = ImVec4(1.0f, 0.05f, 0.1f, 1.00f);
 
     ourShader = new Shader{
-        FileSystem::getPath(R"(resources/shader/043_love_demo/petal.vert)").c_str(),
-        FileSystem::getPath(R"(resources/shader/043_love_demo/petal.frag)").c_str()
+        FileSystem::getPath(R"(resources/shader/044_cube_map/petal.vert)").c_str(),
+        FileSystem::getPath(R"(resources/shader/044_cube_map/petal.frag)").c_str()
+    };
+    skyShader = new Shader{
+        FileSystem::getPath(R"(resources/shader/common/sky.vert)").c_str(),
+        FileSystem::getPath(R"(resources/shader/common/sky.frag)").c_str()
     };
 
     std::thread petalThread(UpdateStatus, window);
@@ -116,6 +122,8 @@ static int ShowWindow() {
 
         glBindVertexArray(0);
     }
+
+    LandscapeSkyMesh landscape_sky_mesh;
     camera.ProcessMouseMovement(0, 30);
 
     while (!glfwWindowShouldClose(window)) {
@@ -155,8 +163,7 @@ static int ShowWindow() {
         }
 
         // 设置清除颜色并清除颜色和深度缓冲区
-        glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w,
-                     bg_color.w);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // 3D渲染部分
@@ -191,6 +198,14 @@ static int ShowWindow() {
                                         GL_UNSIGNED_INT, 0, petalPos.size());
                 glBindVertexArray(0);
             }
+
+            glDepthFunc(GL_LEQUAL);
+            skyShader->use();
+            view = glm::mat4(glm::mat3(camera.GetViewMatrix()));
+            skyShader->setMat4("view", view);
+            skyShader->setMat4("projection", projection);
+            landscape_sky_mesh.Draw(*skyShader);
+            glDepthFunc(GL_LESS);
         }
 
         // 渲染ImGui
@@ -635,7 +650,6 @@ static void ProcessInput(GLFWwindow *window) {
 }
 
 static void ScrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
-    if (true)return;
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 
@@ -645,7 +659,6 @@ static void FramebufferSizeCallback(GLFWwindow *window, int width, int height) {
 }
 
 static void MouseCallback(GLFWwindow *window, double xposIn, double yposIn) {
-    if (true)return;
     auto x_pos = static_cast<float>(xposIn);
     auto y_pos = static_cast<float>(yposIn);
 
